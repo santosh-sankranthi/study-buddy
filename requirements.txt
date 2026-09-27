@@ -1,0 +1,14 @@
+# Core workshop dependencies. Install with: pip install -r requirements.txt
+openai>=1.40            # talks to OpenRouter (OpenAI-compatible API)
+python-dotenv>=1.0      # loads .env
+pydantic>=2.7           # structured output schemas
+tiktoken>=0.7           # token counting (Phase 0)
+numpy>=1.26             # hand-rolled vectors (Phase 3)
+chromadb>=0.5           # embedded vector store (Phase 4+)
+fastapi>=0.115          # backend
+uvicorn[standard]>=0.30 # ASGI server
+pytest>=8.0             # self-check scripts, evals, regression tests
+
+# Phase 7 only (official MCP Python SDK). Kept here so `pip install -r` sets up
+# the whole workshop in one go; nothing before Phase 7 imports it.
+mcp>=1.0
