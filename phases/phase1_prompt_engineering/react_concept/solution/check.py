@@ -1,42 +1,30 @@
-"""Self-check -- ReAct concept exercise.
-
-Run:
-    python phases/phase1_prompt_engineering/react_concept/solution/check.py
-"""
-
-import importlib.util
-import sys
+"""Self-check for Phase 1.6 ReAct Concept."""
+import argparse
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+HERE = Path(__file__).resolve().parent
+TARGET = HERE.parent
 
-spec = importlib.util.spec_from_file_location(
-    "ex", Path(__file__).resolve().parents[1] / "exercise" / "main.py"
-)
-ex = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(ex)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--solution", action="store_true")
+    args = parser.parse_args()
 
-print("Checking ReAct concept exercise ...\n")
+    doc = (TARGET / "solution" / "trace.md") if args.solution else (TARGET / "exercise" / "trace.md")
+    content = doc.read_text(encoding="utf-8")
 
-trace = ex.run_full_trace()
-assert len(trace) == 3, f"Expected 3 steps in trace, got {len(trace)}"
-print("✅  Trace has 3 steps")
+    t_cnt = content.count("Thought:")
+    a_cnt = content.count("Action:")
+    o_cnt = content.count("Observation:")
 
-# Check step 1
-s1 = trace[0]
-assert "calculate_grade" in s1["action"]
-assert "81.00%" in s1["observation"]
-print("✅  Step 1 correctly invokes calculate_grade and yields 81.00%")
+    assert t_cnt >= 3, f"Expected at least 3 Thought: steps, found {t_cnt}"
+    assert a_cnt >= 3, f"Expected at least 3 Action: steps, found {a_cnt}"
+    assert "FINISH(" in content, "Trace must end with Action: FINISH(answer=...)"
 
-# Check step 2
-s2 = trace[1]
-assert "get_exam_schedule" in s2["action"]
-assert "2026-11-01" in s2["observation"]
-print("✅  Step 2 correctly invokes get_exam_schedule and yields 2026-11-01")
+    if not args.solution:
+        assert "TODO" not in content, "Please complete the trace steps in trace.md"
 
-# Check step 3
-s3 = trace[2]
-assert s3["action"].startswith("FINISH(")
-print("✅  Step 3 action starts with FINISH(")
+    print(f"✅ ReAct concept check passed ({doc.name})!")
 
-print("\n✅  All checks passed!")
+if __name__ == "__main__":
+    main()

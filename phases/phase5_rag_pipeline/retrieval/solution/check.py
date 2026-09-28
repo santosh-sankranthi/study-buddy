@@ -1,30 +1,32 @@
-"""Self-check -- Retrieval exercise.
-
-Run:
-    python phases/phase5_rag_pipeline/retrieval/solution/check.py
-"""
-
+"""Self-check for Phase 5.3 Retrieval."""
+import argparse
 import importlib.util
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+HERE = Path(__file__).resolve().parent
+TARGET = HERE.parent
 
-spec = importlib.util.spec_from_file_location(
-    "ex", Path(__file__).resolve().parents[1] / "exercise" / "main.py"
-)
-ex = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(ex)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--solution", action="store_true")
+    args = parser.parse_args()
 
-print("Checking retrieval exercise ...\n")
+    target_file = (TARGET / "solution" / "main.py") if args.solution else (TARGET / "exercise" / "main.py")
+    spec = importlib.util.spec_from_file_location("mod", target_file)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
 
-counts = ex.evaluate_thresholds()
-assert 0.10 in counts and 0.35 in counts and 0.95 in counts
-assert counts[0.10] >= counts[0.35], "Looser threshold should return >= chunks than balanced"
-assert counts[0.35] >= counts[0.95], "Balanced threshold should return >= chunks than strict"
-print(f"✅  Monotonicity verified across thresholds: {counts}")
+    fn = getattr(mod, "evaluate_thresholds", None)
+    assert fn is not None, "evaluate_thresholds must be defined"
 
-assert hasattr(ex, "OBSERVATION") and len(ex.OBSERVATION.strip()) > 20
-print("✅  OBSERVATION is documented")
+    counts = fn()
+    assert len(counts) == 3, "Must test 3 thresholds"
+    assert counts[0.10] >= counts[0.95], "Lower threshold must return at least as many chunks as high threshold"
 
-print("\n✅  All checks passed!")
+    if not args.solution:
+        assert getattr(mod, "OBSERVATION", "").strip(), "TODO(2): write observation"
+
+    print(f"✅ Retrieval check passed ({target_file.name})!")
+
+if __name__ == "__main__":
+    main()

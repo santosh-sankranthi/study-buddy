@@ -1,40 +1,29 @@
-"""Self-check -- Eval Groundedness exercise.
-
-Run:
-    python phases/phase5_rag_pipeline/eval_groundedness/solution/check.py
-"""
-
+"""Self-check for Phase 5.5 Groundedness Eval."""
+import argparse
 import importlib.util
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+HERE = Path(__file__).resolve().parent
+TARGET = HERE.parent
 
-spec = importlib.util.spec_from_file_location(
-    "ex", Path(__file__).resolve().parents[1] / "exercise" / "main.py"
-)
-ex = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(ex)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--solution", action="store_true")
+    args = parser.parse_args()
 
-print("Checking eval groundedness exercise ...\n")
+    target_file = (TARGET / "solution" / "main.py") if args.solution else (TARGET / "exercise" / "main.py")
+    spec = importlib.util.spec_from_file_location("mod", target_file)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
 
-results = ex.evaluate_rag_test_suite()
-assert len(results) == 3, f"Expected 3 test results, got {len(results)}"
+    fn = getattr(mod, "evaluate_rag_test_suite", None)
+    assert fn is not None, "evaluate_rag_test_suite must be defined"
 
-# Map results by id
-by_id = {r["id"]: r for r in results}
+    results = fn()
+    assert results.get("good_answer_passed") is True, "Good answer must pass"
+    assert results.get("bad_answer_failed") is True, "Uncited answer must fail"
 
-# Check grounded_valid
-assert by_id["grounded_valid"]["det_passed"] is True
-assert by_id["grounded_valid"]["grounded_passed"] is True
-print("✅  grounded_valid passed both deterministic and groundedness checks")
+    print(f"✅ RAG groundedness eval check passed ({target_file.name})!")
 
-# Check missing_citation
-assert by_id["missing_citation"]["det_passed"] is False
-print("✅  missing_citation correctly failed the deterministic citation check")
-
-# Check hallucination
-assert by_id["hallucination"]["grounded_passed"] is False
-print("✅  hallucination correctly flagged as ungrounded")
-
-print("\n✅  All checks passed!")
+if __name__ == "__main__":
+    main()

@@ -137,18 +137,19 @@ study-buddy/
 ├── common/              # Shared client: llm.chat() + token counting
 ├── data/sample_notes/   # 13 sample study notes across Biology, Physics, CS
 ├── mcp_server/          # Standard Model Context Protocol (MCP) server
-├── scripts/             # smoke_test.py, tag_phases.sh
+├── scripts/             # smoke_test.py, switch_version.py, tag_concepts.sh
+├── instructor_guides/   # Detailed pedagogical guides & timing for Phases 0–9
 └── phases/
     ├── phase0_fundamentals/       (tokens, context_window, training_vs_inference, sampling)
-    ├── phase1_prompt_engineering/ (system_prompts, few_shot, cot, structured_output, function_calling, react)
-    ├── phase2_context_engineering/ (context_injection, session_memory, context_compaction, long_context, prompt_injection)
-    ├── phase3_embeddings/          (vector_math, embedding_api, semantic_search)
-    ├── phase4_vector_databases/    (vector_db_basics, metadata_filtering)
-    ├── phase5_rag_pipeline/        (chunking, indexing, retrieval, grounded_generation, eval_groundedness)
-    ├── phase6_agents_and_tools/    (function_calling_live, react_loop, agent_safety, multi_agent)
-    ├── phase7_production_evals/    (latency_cost, evals_deterministic, llm_as_judge, regression_testing)
-    ├── phase8_security_safety/     (prompt_injection_advanced, pii_scrubbing, rag_isolation, output_moderation)
-    └── phase9_advanced_capstone/   (fine_tuning_concepts, multimodal, eval_frameworks, capstone)
+    ├── phase1_prompt_engineering/ (system_prompts, few_shot_zero_shot, cot, structured_output, function_calling_concept, react_concept)
+    ├── phase2_context_engineering/ (context_sources, memory, context_compaction, long_context, context_security, mcp_concept)
+    ├── phase3_embeddings/          (vector_representations, embedding_models, semantic_search)
+    ├── phase4_vector_databases/    (indexing, similarity_search)
+    ├── phase5_rag_pipeline/        (chunking, embedding, retrieval, grounded_generation, eval_groundedness)
+    ├── phase6_agents_and_tools/    (tools, function_calling_live, react_loop, agent_loops, multi_agent)
+    ├── phase7_mcp/                 (servers, tools_resources, clients, hosts)
+    ├── phase8_safety/              (prompt_injection, privacy, bias, moderation, adversarial_testing)
+    └── phase9_eval_observability/  (deterministic_evals, model_based_evals, human_evals, metrics_regression, tracing, production_monitoring)
 ```
 
 ## 8. Available API Endpoints

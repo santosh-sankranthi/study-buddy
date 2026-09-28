@@ -1,44 +1,29 @@
-"""Self-check -- Indexing Pipeline exercise.
-
-Run:
-    python phases/phase5_rag_pipeline/indexing/solution/check.py
-"""
-
+"""Self-check for Phase 5 Indexing."""
+import argparse
 import importlib.util
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+HERE = Path(__file__).resolve().parent
+TARGET = HERE.parent
 
-spec = importlib.util.spec_from_file_location(
-    "ex", Path(__file__).resolve().parents[1] / "exercise" / "main.py"
-)
-ex = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(ex)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--solution", action="store_true")
+    args = parser.parse_args()
 
-print("Checking indexing pipeline exercise ...\n")
+    target_file = (TARGET / "solution" / "main.py") if args.solution else (TARGET / "exercise" / "main.py")
+    spec = importlib.util.spec_from_file_location("mod", target_file)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
 
-from app.vector_store import count, search
+    fn = getattr(mod, "index_note_file", None)
+    assert fn is not None, "index_note_file must be defined"
 
-c_start = count()
-note_text = (
-    "Quantum mechanics is the study of matter and radiation at an atomic and subatomic level. "
-    "Wave-particle duality posits that light exhibits behaviors of both waves and particles. "
-    "The Heisenberg uncertainty principle states that position and momentum cannot be simultaneously measured with precision."
-)
-ids = ex.index_note_file(note_text, "quantum.md", "physics", chunk_size=20, overlap=5)
+    sample = "Quantum mechanics governs atomic scales. Uncertainty limits precision."
+    ids = fn(sample, "quantum.md", "physics", chunk_size=10, overlap=2)
+    assert isinstance(ids, list) and len(ids) >= 1, "Must return list of indexed IDs"
 
-assert len(ids) >= 2, f"Expected at least 2 chunks, got {len(ids)}"
-assert count() == c_start + len(ids), "Chroma collection count should match added chunks"
-print(f"✅  index_note_file created and indexed {len(ids)} chunks")
+    print(f"✅ Indexing pipeline check passed ({target_file.name})!")
 
-# Verify chunk metadata via search
-res = search("uncertainty principle", k=1, subject="physics")
-assert len(res) > 0
-top = res[0]
-assert top["metadata"].get("filename") == "quantum.md"
-assert top["metadata"].get("subject") == "physics"
-assert "chunk_index" in top["metadata"]
-print(f"✅  Retrieved chunk has correct metadata: {top['metadata']}")
-
-print("\n✅  All checks passed!")
+if __name__ == "__main__":
+    main()

@@ -1,37 +1,29 @@
-"""Self-check -- Function Calling exercise.
-
-Run:
-    python phases/phase1_prompt_engineering/function_calling_concept/solution/check.py
-"""
-
+"""Self-check for Phase 1.5 Function Calling Concept."""
+import argparse
 import importlib.util
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+HERE = Path(__file__).resolve().parent
+TARGET = HERE.parent
 
-spec = importlib.util.spec_from_file_location(
-    "ex", Path(__file__).resolve().parents[1] / "exercise" / "main.py"
-)
-ex = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(ex)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--solution", action="store_true")
+    args = parser.parse_args()
 
-print("Checking function calling exercise ...\n")
+    target_file = (TARGET / "solution" / "main.py") if args.solution else (TARGET / "exercise" / "main.py")
+    spec = importlib.util.spec_from_file_location("mod", target_file)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
 
-# Verify calculate_grade schema
-schema = ex.get_calculate_grade_schema()
-assert schema["type"] == "function"
-assert schema["function"]["name"] == "calculate_grade"
-print("✅  calculate_grade tool schema exists")
+    schema = getattr(mod, "GRADE_TOOL_SCHEMA", {})
+    assert schema.get("type") == "function", "TODO(1): Schema type must be 'function'"
+    fn = schema.get("function", {})
+    assert fn.get("name") == "calculate_grade", "Tool name must be 'calculate_grade'"
+    params = fn.get("parameters", {}).get("properties", {})
+    assert "scores" in params and "weights" in params, "Parameters must include 'scores' and 'weights'"
 
-# Verify required fields
-req = ex.get_required_fields()
-assert "scores" in req and "weights" in req, f"Expected scores and weights in required. Got: {req}"
-print("✅  Required fields include scores and weights")
+    print(f"✅ Function calling concept check passed ({target_file.name})!")
 
-# Verify property types
-props = ex.check_property_types()
-assert props.get("scores") == "array" and props.get("weights") == "array"
-print("✅  Property types are both 'array'")
-
-print("\n✅  All checks passed!")
+if __name__ == "__main__":
+    main()

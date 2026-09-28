@@ -1,37 +1,30 @@
-"""Self-check -- CoT exercise.
-
-Run:
-    python phases/phase1_prompt_engineering/cot/solution/check.py
-"""
-
+"""Self-check for Phase 1.3 CoT."""
+import argparse
 import importlib.util
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+HERE = Path(__file__).resolve().parent
+TARGET = HERE.parent
 
-spec = importlib.util.spec_from_file_location(
-    "ex", Path(__file__).resolve().parents[1] / "exercise" / "main.py"
-)
-ex = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(ex)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--solution", action="store_true")
+    args = parser.parse_args()
 
-print("Checking cot exercise ...\n")
+    target_file = (TARGET / "solution" / "main.py") if args.solution else (TARGET / "exercise" / "main.py")
+    spec = importlib.util.spec_from_file_location("mod", target_file)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
 
-assert hasattr(ex, "results_no_cot") and len(ex.results_no_cot) == 3, \
-    "results_no_cot must have 3 entries."
-print("✅  results_no_cot has 3 entries")
+    r_no = getattr(mod, "results_no_cot", [])
+    r_cot = getattr(mod, "results_cot", [])
+    assert len(r_no) == 3, "TODO(1): results_no_cot must have 3 entries"
+    assert len(r_cot) == 3, "TODO(2): results_cot must have 3 entries"
 
-assert hasattr(ex, "results_cot") and len(ex.results_cot) == 3, \
-    "results_cot must have 3 entries."
-print("✅  results_cot has 3 entries")
+    obs = getattr(mod, "OBSERVATION", "")
+    assert isinstance(obs, str) and len(obs.strip()) > 20, "TODO(3): OBSERVATION must be > 20 characters"
 
-assert all(isinstance(r, str) and r for r in ex.results_no_cot), "All results must be strings."
-assert all(isinstance(r, str) and r for r in ex.results_cot),    "All results must be strings."
-print("✅  All results are non-empty strings")
+    print(f"✅ CoT check passed ({target_file.name})!")
 
-assert isinstance(ex.OBSERVATION, str) and len(ex.OBSERVATION.strip()) > 20, \
-    "OBSERVATION must be > 20 chars."
-print("✅  OBSERVATION is filled in")
-
-print("\n✅  All checks passed!")
+if __name__ == "__main__":
+    main()

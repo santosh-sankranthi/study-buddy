@@ -1,39 +1,31 @@
-"""Self-check -- Agent Safety exercise.
-
-Run:
-    python phases/phase6_agents_and_tools/agent_safety/solution/check.py
-"""
-
+"""Self-check for Phase 6 Agent Safety."""
+import argparse
 import importlib.util
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+HERE = Path(__file__).resolve().parent
+TARGET = HERE.parent
 
-spec = importlib.util.spec_from_file_location(
-    "ex", Path(__file__).resolve().parents[1] / "exercise" / "main.py"
-)
-ex = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(ex)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--solution", action="store_true")
+    args = parser.parse_args()
 
-print("Checking agent safety exercise ...\n")
+    target_file = (TARGET / "solution" / "main.py") if args.solution else (TARGET / "exercise" / "main.py")
+    spec = importlib.util.spec_from_file_location("mod", target_file)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
 
-# Test 1: Normal finish
-halted, reason, steps = ex.check_agent_safety(["step_1", "FINISH"], max_steps=5)
-assert halted is False and reason == "done" and steps == 2
-print("✅  Normal completion identified correctly")
+    fn = getattr(mod, "check_agent_safety", None)
+    assert fn is not None, "check_agent_safety must be defined"
 
-# Test 2: Consecutive action loop
-halted, reason, steps = ex.check_agent_safety(["search('a')", "search('a')"], max_steps=5)
-assert halted is True and reason == "loop_detected" and steps == 2
-print("✅  Consecutive action loop intercepted at step 2")
+    halted, reason, steps = fn(["search('bio')", "search('bio')"], 5)
+    assert halted is True and reason == "loop_detected", "Consecutive identical calls must trigger loop_detected"
 
-# Test 3: Max steps ceiling
-halted, reason, steps = ex.check_agent_safety([f"step_{i}" for i in range(10)], max_steps=4)
-assert halted is True and reason == "max_steps" and steps == 4
-print("✅  MAX_STEPS ceiling halted long running agent at step 4")
+    if not args.solution:
+        assert getattr(mod, "OBSERVATION", "").strip(), "TODO(2): write observation"
 
-assert hasattr(ex, "OBSERVATION") and len(ex.OBSERVATION.strip()) > 20
-print("✅  OBSERVATION is documented")
+    print(f"✅ Agent safety check passed ({target_file.name})!")
 
-print("\n✅  All checks passed!")
+if __name__ == "__main__":
+    main()

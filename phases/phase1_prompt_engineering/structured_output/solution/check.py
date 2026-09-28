@@ -1,36 +1,34 @@
-"""Self-check -- Structured Output exercise.
-
-Run:
-    python phases/phase1_prompt_engineering/structured_output/solution/check.py
-"""
-
+"""Self-check for Phase 1.4 Structured Output."""
+import argparse
 import importlib.util
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+HERE = Path(__file__).resolve().parent
+TARGET = HERE.parent
 
-spec = importlib.util.spec_from_file_location(
-    "ex", Path(__file__).resolve().parents[1] / "exercise" / "main.py"
-)
-ex = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(ex)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--solution", action="store_true")
+    args = parser.parse_args()
 
-print("Checking structured output exercise ...\n")
+    target_file = (TARGET / "solution" / "main.py") if args.solution else (TARGET / "exercise" / "main.py")
+    spec = importlib.util.spec_from_file_location("mod", target_file)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
 
-from app.schemas import StudyPlanDay
+    cls = getattr(mod, "StudyPlanDay", None)
+    assert cls is not None, "StudyPlanDay class must be defined"
 
-# Test parse_and_validate_plan
-test_json = '[{"subject": "Biology", "topics": ["Cells", "Mitosis"], "minutes": 45}]'
-parsed = ex.parse_and_validate_plan(test_json)
-assert len(parsed) == 1, "Expected 1 item in parsed list"
-assert isinstance(parsed[0], StudyPlanDay), "Item must be an instance of StudyPlanDay"
-assert parsed[0].minutes == 45
-print("✅  parse_and_validate_plan correctly validates valid input")
+    fn = getattr(mod, "parse_and_validate_plan", None)
+    assert fn is not None, "parse_and_validate_plan function must be defined"
 
-# Test validation rejection
-caught = ex.verify_catches_invalid()
-assert caught is True, "verify_catches_invalid() should return True when bad item is rejected"
-print("✅  verify_catches_invalid() properly caught negative minutes")
+    test_data = [{"subject": "Math", "topics": ["Algebra", "Calculus"], "minutes": 120}]
+    validated = fn(test_data)
+    assert len(validated) == 1, "Must validate 1 day"
+    assert validated[0].subject == "Math"
+    assert validated[0].minutes == 120
 
-print("\n✅  All checks passed!")
+    print(f"✅ Structured output check passed ({target_file.name})!")
+
+if __name__ == "__main__":
+    main()

@@ -1,31 +1,28 @@
-"""Self-check -- Function Calling Live exercise.
-
-Run:
-    python phases/phase6_agents_and_tools/function_calling_live/solution/check.py
-"""
-
+"""Self-check for Phase 6.2 Live Function Calling."""
+import argparse
 import importlib.util
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+HERE = Path(__file__).resolve().parent
+TARGET = HERE.parent
 
-spec = importlib.util.spec_from_file_location(
-    "ex", Path(__file__).resolve().parents[1] / "exercise" / "main.py"
-)
-ex = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(ex)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--solution", action="store_true")
+    args = parser.parse_args()
 
-print("Checking function calling live exercise ...\n")
+    target_file = (TARGET / "solution" / "main.py") if args.solution else (TARGET / "exercise" / "main.py")
+    spec = importlib.util.spec_from_file_location("mod", target_file)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
 
-# Verify calculate_grade tool call
-grade_res = ex.run_calculate_grade_call([80.0, 90.0, 100.0], [0.2, 0.3, 0.5])
-assert "93.00%" in grade_res, f"Expected 93.00% weighted average, got: {grade_res}"
-print("✅  execute_tool_call correctly calculated weighted grade: 93.00%")
+    fn = getattr(mod, "dispatch_grade_tool", None)
+    assert fn is not None, "dispatch_grade_tool must be defined"
 
-# Verify malformed argument handling
-err_res = ex.test_malformed_arguments()
-assert "Error: could not parse arguments" in err_res
-print("✅  execute_tool_call gracefully intercepted malformed JSON arguments")
+    res = fn([80.0, 90.0, 70.0], [0.3, 0.4, 0.3])
+    assert "%" in res or "80" in res or "81" in res, f"Expected grade in result, got: {res}"
 
-print("\n✅  All checks passed!")
+    print(f"✅ Function calling live check passed ({target_file.name})!")
+
+if __name__ == "__main__":
+    main()

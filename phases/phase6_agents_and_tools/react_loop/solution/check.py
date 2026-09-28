@@ -1,32 +1,28 @@
-"""Self-check -- ReAct Loop exercise.
-
-Run:
-    python phases/phase6_agents_and_tools/react_loop/solution/check.py
-"""
-
+"""Self-check for Phase 6.3 ReAct Loop."""
+import argparse
 import importlib.util
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+HERE = Path(__file__).resolve().parent
+TARGET = HERE.parent
 
-spec = importlib.util.spec_from_file_location(
-    "ex", Path(__file__).resolve().parents[1] / "exercise" / "main.py"
-)
-ex = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(ex)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--solution", action="store_true")
+    args = parser.parse_args()
 
-print("Checking ReAct loop exercise ...\n")
+    target_file = (TARGET / "solution" / "main.py") if args.solution else (TARGET / "exercise" / "main.py")
+    spec = importlib.util.spec_from_file_location("mod", target_file)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
 
-res = ex.run_biology_query()
-assert "answer" in res and res["answer"], "Expected non-empty answer in result"
-assert "steps" in res and res["steps"] >= 1, "Agent should complete in at least 1 step"
-assert res.get("halted") is False, "Agent should complete cleanly without halting"
-print(f"✅  agent_loop finished successfully in {res['steps']} step(s)")
+    q = getattr(mod, "TWO_TOOL_QUESTION", "")
+    assert isinstance(q, str) and len(q.strip()) > 20, "TODO(1): TWO_TOOL_QUESTION must be a non-empty question"
 
-# Validate trace
-valid_trace = ex.validate_trace_structure(res)
-assert valid_trace is True, "Trace steps missing required keys"
-print(f"✅  Execution trace conforms to Thought/Action/Observation schema ({len(res['trace'])} records)")
+    if not args.solution:
+        assert getattr(mod, "OBSERVATION", "").strip(), "TODO(2): write observation"
 
-print("\n✅  All checks passed!")
+    print(f"✅ ReAct loop check passed ({target_file.name})!")
+
+if __name__ == "__main__":
+    main()

@@ -1,36 +1,31 @@
-"""Self-check -- Long Context exercise.
-
-Run:
-    python phases/phase2_context_engineering/long_context/solution/check.py
-"""
-
+"""Self-check for Phase 2.4 Long Context."""
+import argparse
 import importlib.util
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+HERE = Path(__file__).resolve().parent
+TARGET = HERE.parent
 
-spec = importlib.util.spec_from_file_location(
-    "ex", Path(__file__).resolve().parents[1] / "exercise" / "main.py"
-)
-ex = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(ex)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--solution", action="store_true")
+    args = parser.parse_args()
 
-print("Checking long context exercise ...\n")
+    target_file = (TARGET / "solution" / "main.py") if args.solution else (TARGET / "exercise" / "main.py")
+    spec = importlib.util.spec_from_file_location("mod", target_file)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
 
-# Test calculate_cost
-cost = ex.calculate_cost(input_tokens=1_000_000, output_tokens=1_000_000, price_per_m_input=0.50, price_per_m_output=1.50)
-assert cost == 2.0, f"Expected 2.0, got {cost}"
-print("✅  calculate_cost calculates exact price correctly")
+    fn = getattr(mod, "calculate_cost", None)
+    assert fn is not None, "calculate_cost must be defined"
 
-# Test 10-turn modeling
-cost_10k = ex.model_10_turn_session(10_000)
-cost_100k = ex.model_10_turn_session(100_000)
-assert cost_100k > cost_10k * 8, "Cost should scale with doc token size"
-print(f"✅  10-turn session modeling scales properly (${cost_10k:.4f} vs ${cost_100k:.4f})")
+    cost = fn(1_000_000, 1.50)
+    assert abs(cost - 1.50) < 0.001, f"Expected 1.50, got {cost}"
 
-# Test observation
-assert hasattr(ex, "OBSERVATION") and len(ex.OBSERVATION.strip()) > 30
-print("✅  OBSERVATION is documented")
+    if not args.solution:
+        assert getattr(mod, "OBSERVATION", "").strip(), "TODO(2): write observation"
 
-print("\n✅  All checks passed!")
+    print(f"✅ Long context check passed ({target_file.name})!")
+
+if __name__ == "__main__":
+    main()

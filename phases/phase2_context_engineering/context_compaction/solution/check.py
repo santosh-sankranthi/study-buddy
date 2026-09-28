@@ -1,39 +1,30 @@
-"""Self-check -- Context Compaction exercise.
-
-Run:
-    python phases/phase2_context_engineering/context_compaction/solution/check.py
-"""
-
+"""Self-check for Phase 2.3 Compaction."""
+import argparse
 import importlib.util
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+HERE = Path(__file__).resolve().parent
+TARGET = HERE.parent
 
-spec = importlib.util.spec_from_file_location(
-    "ex", Path(__file__).resolve().parents[1] / "exercise" / "main.py"
-)
-ex = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(ex)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--solution", action="store_true")
+    args = parser.parse_args()
 
-print("Checking context compaction exercise ...\n")
+    target_file = (TARGET / "solution" / "main.py") if args.solution else (TARGET / "exercise" / "main.py")
+    spec = importlib.util.spec_from_file_location("mod", target_file)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
 
-from app import memory
+    fn = getattr(mod, "compact_keep_last2", None)
+    assert fn is not None, "compact_keep_last2 function must be defined"
 
-sid = "check-compact-keep2"
-ex.setup_test_conversation(sid)
-assert len(memory.get_history(sid)) == 6, "Expected 6 messages after setup"
-print("✅  setup_test_conversation creates 6 messages")
+    conv = mod.setup_test_conversation("test_sid")
+    compacted = fn(conv)
+    assert len(compacted) == 3, f"Expected 3 items (summary + last 2), got {len(compacted)}"
+    assert "[SUMMARY]" in compacted[0]["content"], "First message must be summary"
 
-history = ex.run_and_verify_keep_last2(sid)
-assert len(history) == 3, f"Expected exactly 3 messages after keep_last2, got {len(history)}"
-print("✅  Compacted history contains exactly 3 messages")
+    print(f"✅ Context compaction check passed ({target_file.name})!")
 
-assert history[0]["role"] == "system" and "[SUMMARY" in history[0]["content"]
-print("✅  First message is a [SUMMARY] system message")
-
-assert history[1]["content"] == "And the third law?"
-assert "opposite reaction" in history[2]["content"]
-print("✅  Last 2 turns preserved verbatim")
-
-print("\n✅  All checks passed!")
+if __name__ == "__main__":
+    main()

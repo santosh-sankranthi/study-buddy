@@ -1,31 +1,32 @@
-"""Self-check -- Semantic Search exercise.
-
-Run:
-    python phases/phase3_embeddings/semantic_search/solution/check.py
-"""
-
+"""Self-check for Phase 3.3 Semantic Search."""
+import argparse
 import importlib.util
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+HERE = Path(__file__).resolve().parent
+TARGET = HERE.parent
 
-spec = importlib.util.spec_from_file_location(
-    "ex", Path(__file__).resolve().parents[1] / "exercise" / "main.py"
-)
-ex = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(ex)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--solution", action="store_true")
+    args = parser.parse_args()
 
-print("Checking semantic search exercise ...\n")
+    target_file = (TARGET / "solution" / "main.py") if args.solution else (TARGET / "exercise" / "main.py")
+    spec = importlib.util.spec_from_file_location("mod", target_file)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
 
-top_results = ex.evaluate_phrasings()
-assert len(top_results) == 3, f"Expected 3 results, got {len(top_results)}"
+    corpus = getattr(mod, "CUSTOM_CORPUS", [])
+    assert len(corpus) >= 3, "TODO(1): CUSTOM_CORPUS must contain at least 3 sentences"
 
-for i, doc in enumerate(top_results):
-    assert "Photosynthesis" in doc, f"Phrasing {i} failed to rank photosynthesis first. Got: {doc}"
-print("✅  All 3 phrasings successfully ranked the Photosynthesis document at #1")
+    fn = getattr(mod, "rank_custom_corpus", None)
+    assert fn is not None, "rank_custom_corpus must be defined"
 
-assert hasattr(ex, "OBSERVATION") and len(ex.OBSERVATION.strip()) > 20
-print("✅  OBSERVATION is documented")
+    ranked = fn("chloroplast")
+    assert len(ranked) == len(corpus), "Ranked list must score all corpus items"
+    assert ranked[0][1] >= ranked[-1][1], "Ranked list must be sorted descending"
 
-print("\n✅  All checks passed!")
+    print(f"✅ Semantic search check passed ({target_file.name})!")
+
+if __name__ == "__main__":
+    main()
