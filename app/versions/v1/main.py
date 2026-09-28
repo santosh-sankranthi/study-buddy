@@ -1,70 +1,195 @@
-"""Study Buddy v1 — Personas, CoT reasoning, structured output endpoints."""
-import re
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+"""Study Buddy — the evolving backend.
 
-from fastapi import FastAPI
+This file grows every phase. Reading the git diff between two phase tags shows
+exactly what changed and why.
+
+Phase progression:
+  v0  — raw one-shot Q&A (the starting point)
+  v1  — system prompts, CoT, structured output (/modes, /flashcards, /quiz-item, /study-plan, /tools)
+  v2  — session memory, context compaction, context report, long-context measurement
+  v3  — embeddings + vector database (/embed, /similarity-demo, /semantic-search, /notes/*)
+  v4  — grounded RAG in /ask
+  v5  — agents (/agent/ask, /agent/plan-and-execute)
+  v6  — MCP (/mcp/tools)
+  v7  — security middleware (injection, PII, moderation)
+  v8  — evaluation endpoints (/eval/groundedness-report, /eval/regression-report)
+"""
+
+from __future__ import annotations
+
+import sys
+import re
+from pathlib import Path
+
+# Locate the app package by walking up from this file, so this module works
+# both as app/main.py and as a snapshot under app/versions/vN/.
+_APP_DIR = Path(__file__).resolve()
+while _APP_DIR.name != "app" and _APP_DIR.parent != _APP_DIR:
+    _APP_DIR = _APP_DIR.parent
+sys.path.insert(0, str(_APP_DIR.parent))
+
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
+
 from common.llm import chat
 from common.tokens import count_tokens
-from app.prompts import TUTOR_SYSTEM_PROMPT, FLASHCARD_SYSTEM_PROMPT, build_few_shot_prompt
-from app.schemas import Flashcard, StudyPlanDay
+from app.prompts import build_few_shot_prompt, build_system
+from app.schemas import Flashcard, QuizItem, StudyPlanDay
+from app.tools import TOOLS
 
-STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
-app = FastAPI(title="Study Buddy v1")
-if STATIC_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+STATIC_DIR = _APP_DIR / "static"
+
+app = FastAPI(title="Study Buddy", version="v1")
 
 class AskRequest(BaseModel):
-    question: str
-    mode: str = "tutor"
-    cot: bool = False
+    question:    str
+    mode:        str   = "tutor"
+    cot:         bool  = False
     temperature: float = 0.7
-    top_p: float = 1.0
+    top_p:       float = 1.0
+
 
 class AskResponse(BaseModel):
-    answer: str
-    thinking: str | None = None
-    input_tokens: int = 0
+    answer:        str
+    thinking:      str | None = None
+    input_tokens:  int = 0
     output_tokens: int = 0
 
-@app.get("/")
-def read_root():
-    return FileResponse(STATIC_DIR / "index.html")
-
 @app.post("/ask", response_model=AskResponse)
-def ask(req: AskRequest) -> AskResponse:
-    messages = []
-    if req.mode == "tutor":
-        messages.append({"role": "system", "content": TUTOR_SYSTEM_PROMPT})
-    elif req.mode == "flashcard":
-        messages.append({"role": "system", "content": FLASHCARD_SYSTEM_PROMPT})
+def ask(request: AskRequest) -> AskResponse:
+    """Send a question to Study Buddy. Behaviour grows phase by phase."""
+    system_content = build_system(mode=request.mode)
 
-    user_text = req.question
-    if req.cot:
-        user_text += "\n\nThink step by step. Wrap reasoning in <thinking>...</thinking> and answer in <answer>...</answer>."
-    messages.append({"role": "user", "content": user_text})
+    messages: list[dict] = []
+    if system_content:
+        messages.append({"role": "system", "content": system_content})
 
-    raw = chat(messages, temperature=req.temperature, top_p=req.top_p)
-    thinking = None
-    answer = raw
-    if req.cot:
-        m_t = re.search(r"<thinking>(.*?)</thinking>", raw, re.DOTALL)
-        m_a = re.search(r"<answer>(.*?)</answer>", raw, re.DOTALL)
-        if m_t: thinking = m_t.group(1).strip()
-        if m_a: answer = m_a.group(1).strip()
+    # Phase 1.3: CoT injection.
+    user_content = request.question
+    if request.cot:
+        user_content += (
+            "\n\nThink step by step before answering. "
+            "Wrap your reasoning in <thinking>...</thinking> "
+            "and your final answer in <answer>...</answer>."
+        )
+    messages.append({"role": "user", "content": user_content})
+
+    raw_answer = chat(messages, temperature=request.temperature, top_p=request.top_p)
+
+    thinking: str | None = None
+    final_answer = raw_answer
+    if request.cot:
+        t_match = re.search(r"<thinking>(.*?)</thinking>", raw_answer, re.DOTALL)
+        a_match = re.search(r"<answer>(.*?)</answer>", raw_answer, re.DOTALL)
+        if t_match:
+            thinking = t_match.group(1).strip()
+        if a_match:
+            final_answer = a_match.group(1).strip()
 
     return AskResponse(
-        answer=answer,
+        answer=final_answer,
         thinking=thinking,
-        input_tokens=count_tokens(req.question),
-        output_tokens=count_tokens(answer),
+        input_tokens=count_tokens(request.question),
+        output_tokens=count_tokens(final_answer),
     )
 
+@app.get("/modes")
+def list_modes() -> list[str]:
+    return ["tutor", "direct", "flashcard"]
+
+QUIZ_EXAMPLES = [
+    {
+        "input":  "Photosynthesis",
+        "output": (
+            '{"question": "Where does photosynthesis occur?", '
+            '"options": ["Mitochondria", "Chloroplast", "Nucleus", "Ribosome"], '
+            '"correct_index": 1}'
+        ),
+    },
+    {
+        "input":  "Newton\'s first law",
+        "output": (
+            '{"question": "What does Newton\'s first law state?", '
+            '"options": ["F = ma", "Objects in motion stay in motion unless acted on", '
+            '"Every action has an equal reaction", "Gravity attracts masses"], '
+            '"correct_index": 1}'
+        ),
+    },
+]
+
+
+@app.post("/quiz-item")
+def make_quiz_item(body: dict) -> dict:
+    topic    = body.get("topic", "")
+    messages = [
+        {"role": "system", "content": "Return ONLY a valid JSON object matching the QuizItem schema. No other text."},
+    ] + build_few_shot_prompt(QUIZ_EXAMPLES, topic)
+    raw  = chat(messages, temperature=0.3)
+    item = QuizItem.model_validate_json(raw)
+
+    session_id = body.get("session_id")
+    if session_id:
+        from app.memory import add_quiz_item
+        add_quiz_item(session_id, item.model_dump())
+
+    return item.model_dump()
+
 @app.post("/flashcards")
-def make_flashcard(body: dict) -> dict:
-    card = Flashcard(question=f"Key concept in {body.get('topic')}", answer=f"Definition for {body.get('topic')}", difficulty="medium")
+def make_flashcards(body: dict) -> dict:
+    topic = body.get("topic", "")
+    messages = [
+        {
+            "role":    "system",
+            "content": (
+                'Return a valid JSON object: {"question":"...","answer":"...","difficulty":"easy|medium|hard"}. '
+                "No other text, no markdown fences."
+            ),
+        },
+        {"role": "user", "content": f"Topic: {topic}"},
+    ]
+    raw  = chat(messages, temperature=0.3)
+    card = Flashcard.model_validate_json(raw)
     return card.model_dump()
+
+@app.post("/study-plan")
+def make_study_plan(body: dict) -> list:
+    subjects    = body.get("subjects", [])
+    total_hours = body.get("total_hours", 4)
+    messages = [
+        {
+            "role":    "system",
+            "content": (
+                "Return a valid JSON array of StudyPlanDay objects. "
+                'Each object: {"subject":"...","topics":["..."],"minutes":<int>}. '
+                f"Total minutes must not exceed {total_hours * 60}. "
+                "No other text, no markdown fences."
+            ),
+        },
+        {
+            "role":    "user",
+            "content": f"Subjects: {', '.join(subjects)}. Total hours available: {total_hours}.",
+        },
+    ]
+    raw  = chat(messages, temperature=0.3)
+    ta   = TypeAdapter(list[StudyPlanDay])
+    plan = ta.validate_json(raw)
+    total_mins = sum(d.minutes for d in plan)
+    if total_mins > total_hours * 60:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Study plan exceeds the time budget: {total_mins} > {total_hours * 60} minutes.",
+        )
+    return [d.model_dump() for d in plan]
+
+@app.get("/tools")
+def list_tools() -> list:
+    return TOOLS
+
+@app.get("/")
+def index() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
