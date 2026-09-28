@@ -162,6 +162,7 @@ def main() -> None:
     args = parser.parse_args()
 
     base = git("rev-parse", args.base)
+    made: set[str] = set()
 
     with tempfile.TemporaryDirectory() as tmp:
         index = str(Path(tmp) / "index")
@@ -173,6 +174,7 @@ def main() -> None:
             tree = build_tree(index, base, version, remove=[])
             commit = make_commit(tree, base, f"{version}: app/main.py milestone")
             tag(version, commit, f"Study Buddy {version}", args.dry_run)
+            made.add(version)
 
         # ── Concept tags (progressive) ───────────────────────────────────────
         concepts = ordered_concepts()
@@ -202,6 +204,18 @@ def main() -> None:
                     f"{name}: {concept_dir.name} ({beat}) at app milestone {version}",
                 )
                 tag(name, commit, f"{name}", args.dry_run)
+                made.add(name)
+
+    # ── Prune stale tags from earlier generations ────────────────────────────
+    import re
+    family = re.compile(r"^(v[0-8]|p\d+-.+-(?:exercise|demo|solution))$")
+    existing = [t for t in git("tag", "-l").splitlines() if family.match(t)]
+    stale = [t for t in existing if t not in made]
+    if stale:
+        print(f"Pruning {len(stale)} stale tag(s): {', '.join(stale)}")
+        if not args.dry_run:
+            for t in stale:
+                git("tag", "-d", t)
 
     print("Done." + (" (dry run — no tags changed)" if args.dry_run else ""))
 
