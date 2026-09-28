@@ -53,17 +53,16 @@ if mcp_app:
 
     @mcp_app.resource("notes://corpus")
     def get_notes_corpus() -> str:
-        """Expose all indexed course notes as an MCP resource."""
-        try:
-            from app.vector_store import _collection
-            docs = _collection.get(include=["documents", "metadatas"])
-            items = [
-                {"doc_id": id_, "text": doc[:120], "metadata": meta}
-                for id_, doc, meta in zip(docs.get("ids", []), docs.get("documents", []), docs.get("metadatas", []))
-            ]
-            return json.dumps(items)
-        except Exception:
-            return json.dumps([{"doc_id": "1", "text": "Photosynthesis and cellular respiration notes"}])
+        """Expose the sample course notes as an MCP resource."""
+        notes_dir = Path(__file__).resolve().parents[1] / "data" / "sample_notes"
+        items = []
+        if notes_dir.exists():
+            for path in sorted(notes_dir.glob("*.md")):
+                text = path.read_text(encoding="utf-8", errors="ignore").strip()
+                items.append({"file": path.name, "text": text[:120]})
+        return json.dumps(
+            items or [{"file": "photosynthesis.md", "text": "Photosynthesis and cellular respiration notes"}]
+        )
 
 
     @mcp_app.resource("quiz://attempts/{session_id}")

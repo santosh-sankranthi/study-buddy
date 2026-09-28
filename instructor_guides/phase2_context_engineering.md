@@ -17,14 +17,14 @@ uvicorn app.main:app --reload
 3. Try a long back-and-forth, then keep going: the prompt grows without bound
    until it is expensive, slow, and eventually over the window.
 
-Restore later with `python scripts/switch_version.py v8`.
+Restore later with `python scripts/switch_version.py v6`.
 
 ## Learning objectives
 
 1. Enumerate every source that enters the prompt and measure its tokens.
 2. Give the app multi-turn memory via session IDs.
 3. Bound that memory with token-budget trimming and summarisation (compaction).
-4. Feel the cost/latency wall that motivates retrieval (Phase 5).
+4. Feel the cost/latency wall that motivates keeping context small.
 5. Sanitize obvious prompt injection before it reaches the model.
 
 ## Timing & pacing (total ~50 min)
@@ -85,9 +85,9 @@ python phases/phase2_context_engineering/long_context/demo/main.py
 ```
 
 Measures how latency and estimated cost climb as the document grows. Land the
-punchline: pasting the whole textbook is slower and pricier than finding the two
+punchline: pasting the whole textbook is slower and pricier than pasting the two
 relevant paragraphs. **Twist:** students plot latency/cost in steps to build the
-intuition that motivates RAG.
+intuition that motivates keeping context small.
 
 ### 2.5 Context security (light pass) — `phases/phase2_context_engineering/context_security/`
 
@@ -96,13 +96,13 @@ python phases/phase2_context_engineering/context_security/demo/main.py
 ```
 
 `sanitize_input()`/`detect_injection()` strip an obvious "ignore previous
-instructions" and replace it with `[BLOCKED]`. This is a shallow pass; Phase 8
+instructions" and replace it with `[BLOCKED]`. This is a shallow pass; Phase 5
 goes deep. **Twist:** students add detection for a different phrasing family.
 
 ### 2.6 MCP — concept only (no demo/exercise)
 
 Mention it briefly: "MCP is a standard for plugging tools and data into any
-model host; we build one in Phase 7." Do not detour.
+model host; we build one in Phase 4." Do not detour.
 
 ## Common student mistakes
 

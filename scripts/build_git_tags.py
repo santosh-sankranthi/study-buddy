@@ -49,22 +49,18 @@ CONCEPT_ORDER: dict[int, list[str]] = {
         "function_calling_concept", "react_concept"],
     2: ["context_sources", "memory", "context_compaction", "long_context",
         "context_security", "mcp_concept"],
-    3: ["vector_representations", "embedding_models", "semantic_search"],
-    4: ["indexing", "similarity_search"],
-    5: ["chunking", "embedding", "indexing", "retrieval", "grounded_generation",
-        "eval_groundedness"],
-    6: ["tools", "function_calling_live", "react_loop", "agent_loops",
+    3: ["tools", "function_calling_live", "react_loop", "agent_loops",
         "agent_safety", "multi_agent"],
-    7: ["servers", "tools_resources", "clients", "hosts"],
-    8: ["prompt_injection", "rag_isolation", "privacy", "bias", "moderation",
-        "adversarial_testing"],
-    9: ["deterministic_evals", "model_based_evals", "human_evals",
+    4: ["servers", "tools_resources", "clients", "hosts"],
+    5: ["prompt_injection", "privacy", "bias", "moderation", "adversarial_testing"],
+    6: ["deterministic_evals", "model_based_evals", "human_evals",
         "metrics_regression", "tracing", "production_monitoring"],
 }
 
 # Phase -> app milestone used by that phase's concept tags.
-PHASE_VERSION = {0: "v0", 1: "v1", 2: "v2", 3: "v3", 4: "v3",
-                 5: "v4", 6: "v5", 7: "v6", 8: "v7", 9: "v8"}
+# Phases 1 and 2 land at the same milestone as their number; phase 3 is the
+# agents milestone, 4 MCP, 5 safety, 6 evaluation.
+PHASE_VERSION = {0: "v0", 1: "v1", 2: "v2", 3: "v3", 4: "v4", 5: "v5", 6: "v6"}
 
 
 def git(*args: str, index: str | None = None, check: bool = True) -> str:
@@ -169,7 +165,7 @@ def main() -> None:
 
         # ── Version tags ─────────────────────────────────────────────────────
         print("Version tags:")
-        for level in range(0, 9):
+        for level in range(0, 7):
             version = f"v{level}"
             tree = build_tree(index, base, version, remove=[])
             commit = make_commit(tree, base, f"{version}: app/main.py milestone")
@@ -208,7 +204,7 @@ def main() -> None:
 
     # ── Prune stale tags from earlier generations ────────────────────────────
     import re
-    family = re.compile(r"^(v[0-8]|p\d+-.+-(?:exercise|demo|solution))$")
+    family = re.compile(r"^(v\d+|p\d+-.+-(?:exercise|demo|solution))$")
     existing = [t for t in git("tag", "-l").splitlines() if family.match(t)]
     stale = [t for t in existing if t not in made]
     if stale:

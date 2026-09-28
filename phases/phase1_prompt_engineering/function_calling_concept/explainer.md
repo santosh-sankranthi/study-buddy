@@ -53,4 +53,4 @@ Every tool in the OpenAI / OpenRouter format consists of:
 }
 ```
 
-In Phase 1, we master tool schema design. In Phase 6, we implement full multi-step agentic execution.
+In Phase 1, we master tool schema design. In Phase 3, we implement full multi-step agentic execution.

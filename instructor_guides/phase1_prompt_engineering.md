@@ -15,7 +15,7 @@ Ask `What is photosynthesis?` twice. The answers are a different shape each
 time — wrong length, wrong tone, no consistent voice. That inconsistency is the
 whole motivation for a **system prompt**.
 
-When the phase is over, restore the end state: `python scripts/switch_version.py v8`
+When the phase is over, restore the end state: `python scripts/switch_version.py v6`
 (or `v1` to see only this phase's app).
 
 ## Learning objectives
@@ -99,7 +99,7 @@ python phases/phase1_prompt_engineering/function_calling_concept/demo/main.py
 Walk the JSON tool schema in `app/tools.py` (`search_notes`,
 `get_exam_schedule`, `calculate_grade`). Point out `parameters` / `required`.
 This is **schema shape only** — nothing is executed yet (execution returns for
-real in Phase 6). **Twist:** students write their own `get_definition(term)`
+real in Phase 3). **Twist:** students write their own `get_definition(term)`
 tool schema.
 
 ### 1.6 ReAct (concept only) — `phases/phase1_prompt_engineering/react_concept/`
@@ -123,7 +123,7 @@ exam") writing each line by hand — no code. See `exercise/trace.md`.
 - **Schema and prompt drift.** Students change the prompt's JSON shape but not
   the Pydantic model (or vice-versa) → `ValidationError`. Keep them paired.
 - **Confusing schema with execution.** In 1.5 the model *proposes* a call; no
-  Python runs. That comes in 6.2.
+  Python runs. That comes in 3.2.
 
 ## Discussion questions to close
 

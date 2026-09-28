@@ -10,9 +10,8 @@ Context is not just the user's latest question. In a production AI application, 
 1. **System Persona & Constraints:** Base instructions that define behavior and safety guards.
 2. **Dynamic Metadata:** Today's date, student name, grade level, enrolled subjects.
 3. **Session History:** Previous turns between the user and assistant.
-4. **Retrieved Context (RAG):** Relevant knowledge base chunks.
-5. **Tool Output:** Raw execution returns from functions or APIs.
-6. **User Input:** The current user query.
+4. **Tool Output:** Raw execution returns from functions or APIs.
+5. **User Input:** The current user query.
 
 All of these compete for the same **finite context window**.
 

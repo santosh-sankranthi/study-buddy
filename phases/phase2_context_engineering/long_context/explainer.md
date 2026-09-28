@@ -7,7 +7,7 @@
 ## 1. The Long Context Temptation
 
 Modern frontier models boast context windows of 128k, 1M, or even 2M tokens. It is tempting to think:
-*"Why bother with search, databases, or chunking? Let's just dump the entire 500-page textbook into every prompt!"*
+*"Why bother curating or summarising? Let's just dump the entire 500-page textbook into every prompt!"*
 
 ---
 
@@ -30,4 +30,4 @@ Research (Liu et al., 2023) demonstrates that LLMs attend strongly to the very b
 
 ## 3. The Engineering Takeaway
 
-Long context is valuable for complex batch analysis (e.g. analyzing a codebase or reading a complete legal contract once). But for interactive, low-latency, cost-effective applications, **Retrieval-Augmented Generation (RAG)** wins every time.
+Long context is valuable for complex batch analysis (e.g. analyzing a codebase or reading a complete legal contract once). But for interactive, low-latency, cost-effective applications, **curating a small, relevant context** wins every time.

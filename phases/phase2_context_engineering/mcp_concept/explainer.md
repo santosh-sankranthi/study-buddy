@@ -6,4 +6,4 @@ Right now, every time we want Study Buddy to connect to external data or tools, 
 ## How it works
 Model Context Protocol (MCP) is an open, standardized protocol (like USB-C for AI applications) that lets any host app communicate with any tool or data provider over JSON-RPC. A server exposes tools and resources; any compliant client can discover and use them without knowing how they were implemented.
 
-We will build a real MCP server and client in **Phase 7**. For now, remember: tools and resources can be decoupled from the application and served over a universal protocol.
+We will build a real MCP server and client in **Phase 4**. For now, remember: tools and resources can be decoupled from the application and served over a universal protocol.

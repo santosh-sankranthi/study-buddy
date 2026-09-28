@@ -34,11 +34,10 @@ tokens you put in the prompt.
 
 - The model **cannot remember your last conversation** -- if Study Buddy appears
   to, it is because *we* re-sent the history in the prompt (Phase 2, Memory).
-- The model **does not learn your notes** by being shown them once. Grounding in
-  your notes is done at inference time by putting the relevant text in the prompt
-  (Phase 5, RAG) -- not by changing the weights.
+- The model **does not learn your notes** by being shown them once. Anything the
+  model "knows" must be in the prompt -- not baked into the weights.
 - "Can we just fine-tune it on our notes?" is usually the *wrong* first answer:
-  RAG is cheaper, updates instantly when notes change, and can cite sources.
+  fine-tuning is slow, expensive, and does not update when the notes change.
 - Nothing you type in the UI persists server-side unless the code explicitly
   saves it.
 

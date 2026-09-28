@@ -7,12 +7,10 @@ Phase progression:
   v0  — raw one-shot Q&A (the starting point)
   v1  — system prompts, CoT, structured output (/modes, /flashcards, /quiz-item, /study-plan, /tools)
   v2  — session memory, context compaction, context report, long-context measurement
-  v3  — embeddings + vector database (/embed, /similarity-demo, /semantic-search, /notes/*)
-  v4  — grounded RAG in /ask
-  v5  — agents (/agent/ask, /agent/plan-and-execute)
-  v6  — MCP (/mcp/tools)
-  v7  — security middleware (injection, PII, moderation)
-  v8  — evaluation endpoints (/eval/groundedness-report, /eval/regression-report)
+  v3  — agents (/agent/ask, /agent/plan-and-execute)
+  v4  — MCP (/mcp/tools)
+  v5  — security middleware (injection, PII, moderation)
+  v6  — evaluation endpoint (/eval/regression-report)
 
 How to read this file
   Every meaningful block is prefixed with a comment banner:
@@ -30,7 +28,6 @@ from __future__ import annotations
 import sys
 import re
 import time
-import urllib.request
 from pathlib import Path
 
 # Locate the app package by walking up from this file, so this module works
@@ -63,7 +60,7 @@ app = FastAPI(title="Study Buddy", version="v4")
 @app.get("/meta")
 def meta() -> dict:
     """What this version supports; the frontend gates its controls on this."""
-    return {"version": "v4", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'embeddings', 'notes', 'rag']}
+    return {"version": "v4", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp']}
 
 # ────────────────────────────────────────────────────────────────────────────
 # CONCEPT · API request / response contract  [Phase 1.4]
@@ -80,14 +77,11 @@ class AskRequest(BaseModel):
     student_name:     str | None = None
     study_goal:       str | None = None
     compact_strategy: str        = "halve"   # "halve" | "keep_last2"
-    enable_rag:       bool       = True      # Phase 4+
 
 
 class AskResponse(BaseModel):
     answer:          str
     thinking:        str | None = None
-    grounded:        bool = False
-    sources:         list[str] = []
     input_tokens:    int = 0
     output_tokens:   int = 0
     context_report:  dict = {}
@@ -95,7 +89,7 @@ class AskResponse(BaseModel):
     compacted:       bool = False
 
 # ────────────────────────────────────────────────────────────────────────────
-# CONCEPT · /ask — the core endpoint  [Phase 0-9]
+# CONCEPT · /ask — the core endpoint  [Phase 0-6]
 # One question in, one answer out. Each phase adds one step inside this function.
 # ────────────────────────────────────────────────────────────────────────────
 
@@ -125,62 +119,21 @@ def ask(request: AskRequest) -> AskResponse:
         study_goal=request.study_goal,
     )
 
-    # ── CONCEPT · Retrieval [Phase 5] ────────────────────────────────────────
-    # Semantic-search the notes for the most relevant chunks; None = nothing close.
-    grounded = False
-    sources: list[str] = []
-    rag_chunks: list[dict] = []
-    if request.enable_rag:
-        try:
-            from app.vector_store import retrieve
-            from app.rag import extract_sources
-            chunks = retrieve(request.question, k=3)
-            if chunks:
-                rag_chunks = chunks
-                sources    = extract_sources(chunks)
-                grounded   = True
-        except Exception:  # noqa: BLE001 — RAG not set up yet is fine
-            pass
+    messages: list[dict] = []
+    if system_content:
+        messages.append({"role": "system", "content": system_content})
+    messages += history
 
-    # ── CONCEPT · Grounded generation [Phase 5] ──────────────────────────────
-    # If we retrieved notes, build a prompt that answers ONLY from those chunks.
-    if grounded and rag_chunks:
-        from app.rag import build_rag_prompt
-        messages = build_rag_prompt(request.question, rag_chunks)
-        # Prepend history before the RAG user message.
-        if history:
-            messages = [messages[0]] + history + [messages[1]]
-    else:
-        messages = []
-        if system_content:
-            messages.append({"role": "system", "content": system_content})
-        messages += history
-
-        # CONCEPT · Chain of thought: ask for step-by-step reasoning.
-        user_content = request.question
-        if request.cot:
-            user_content += (
-                "\n\nThink step by step before answering. "
-                "Wrap your reasoning in <thinking>...</thinking> "
-                "and your final answer in <answer>...</answer>."
-            )
-        messages.append({"role": "user", "content": user_content})
-
-    # ── CONCEPT · Refusal [Phase 5] ──────────────────────────────────────────
-    # Notes exist but nothing matched: say "I don't know" instead of guessing.
-    if request.enable_rag and not grounded:
-        try:
-            from app.vector_store import count
-            if count() > 0:
-                return AskResponse(
-                    answer="I don't have enough information in your notes to answer this.",
-                    grounded=False,
-                    input_tokens=count_tokens(request.question),
-                    context_report=context_report(messages),
-                    compacted=compacted,
-                )
-        except Exception:  # noqa: BLE001
-            pass
+    # ── CONCEPT · Chain of thought [Phase 1.3] ───────────────────────────────
+    # Ask the model to reason step by step, tagged so we can split it out later.
+    user_content = request.question
+    if request.cot:
+        user_content += (
+            "\n\nThink step by step before answering. "
+            "Wrap your reasoning in <thinking>...</thinking> "
+            "and your final answer in <answer>...</answer>."
+        )
+    messages.append({"role": "user", "content": user_content})
 
     # ── CONCEPT · Context window [Phase 2.1] ─────────────────────────────────
     # Measure the tokens the prompt uses and warn before we hit the model's limit.
@@ -210,8 +163,6 @@ def ask(request: AskRequest) -> AskResponse:
     return AskResponse(
         answer=final_answer,
         thinking=thinking,
-        grounded=grounded,
-        sources=sources,
         input_tokens=input_tokens,
         output_tokens=count_tokens(final_answer),
         context_report=ctx_report,
@@ -401,78 +352,34 @@ def measure_long_context(body: dict) -> list:
     return results
 
 # ────────────────────────────────────────────────────────────────────────────
-# CONCEPT · Embeddings  [Phase 3.2]
-# Turn text into a vector; return its size and a preview.
+# CONCEPT · Agents  [Phase 3]
+# A ReAct loop that calls tools, plus a planner->executor->critic pipeline.
 # ────────────────────────────────────────────────────────────────────────────
 
-@app.post("/embed")
-def embed_endpoint(body: dict) -> dict:
-    from app.embeddings import embed
-    vec = embed(body.get("text", ""))
-    return {"dimensions": len(vec), "preview": vec[:10], "vector": vec}
+@app.post("/agent/ask")
+def agent_ask(body: dict) -> dict:
+    from app.agent import agent_loop
+    return agent_loop(body.get("question", ""))
+
+
+@app.post("/agent/plan-and-execute")
+def agent_plan_and_execute(body: dict) -> dict:
+    from app.agent import plan_and_execute
+    return plan_and_execute(body.get("question", ""))
 
 # ────────────────────────────────────────────────────────────────────────────
-# CONCEPT · Vector representations  [Phase 3.1]
-# Rank toy vectors by cosine similarity -- the idea, by hand.
+# CONCEPT · MCP  [Phase 4]
+# List tools discovered from the MCP server over stdio.
 # ────────────────────────────────────────────────────────────────────────────
 
-@app.get("/similarity-demo")
-def similarity_demo() -> list:
-    from app.embeddings import DEMO_VECS, rank_by_similarity
-    query_vec = [0.88, 0.12, 0.14]  # close to the photosynthesis cluster
-    ranked = rank_by_similarity(query_vec, DEMO_VECS)
-    return [{"text": t, "score": round(s, 4)} for t, s in ranked]
-
-# ────────────────────────────────────────────────────────────────────────────
-# CONCEPT · Semantic search  [Phase 3.3]
-# Rank documents by meaning, not by exact words.
-# ────────────────────────────────────────────────────────────────────────────
-
-@app.post("/semantic-search")
-def semantic_search_endpoint(body: dict) -> list:
-    from app.search import semantic_search
-    return semantic_search(body.get("query", ""), body.get("docs", []), int(body.get("k", 3)))
-
-# ────────────────────────────────────────────────────────────────────────────
-# CONCEPT · Indexing  [Phase 4.1]
-# Chunk notes and store their vectors in ChromaDB.
-# ────────────────────────────────────────────────────────────────────────────
-
-@app.post("/notes/upload")
-def upload_note(body: dict) -> dict:
-    from app.chunker import chunk_fixed, chunk_paragraph
-    from app.vector_store import count, index_document
-
-    filename = body.get("filename", "untitled.md")
-    content  = body.get("content", "")
-    subject  = body.get("subject", "general")
-    strategy = body.get("chunk_strategy", "fixed")   # "fixed" | "paragraph"
-
-    chunks = chunk_paragraph(content) if strategy == "paragraph" else chunk_fixed(content)
-    if not chunks:
-        chunks = [content]
-
-    for i, chunk in enumerate(chunks):
-        index_document(
-            chunk,
-            metadata={"filename": filename, "subject": subject, "chunk_index": i},
-        )
-    return {
-        "indexed":        True,
-        "filename":       filename,
-        "chunks_created": len(chunks),
-        "total_docs":     count(),
-    }
-
-# ────────────────────────────────────────────────────────────────────────────
-# CONCEPT · Similarity search  [Phase 4.2]
-# Query the vector store, optionally filtered by subject.
-# ────────────────────────────────────────────────────────────────────────────
-
-@app.post("/notes/search")
-def search_notes_endpoint(body: dict) -> list:
-    from app.vector_store import search
-    return search(body.get("query", ""), k=int(body.get("k", 3)), subject=body.get("subject"))
+@app.get("/mcp/tools")
+def mcp_tools() -> list:
+    """List tools discovered from the Study Buddy MCP server (Phase 7)."""
+    from app.mcp_client import list_mcp_tools
+    try:
+        return list_mcp_tools()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail=f"MCP server unavailable: {exc}")
 
 # ────────────────────────────────────────────────────────────────────────────
 # CONCEPT · Frontend  [all phases]

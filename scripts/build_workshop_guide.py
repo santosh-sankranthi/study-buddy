@@ -39,41 +39,26 @@ STEPS = [
              ("Long context", "Measure latency/cost as the document grows.", "/measure-long-context"),
              ("Context security", "Obvious injection is stripped before it reaches the model.", "sanitize (Phase 2 light pass)"),
          ]),
-    dict(n=3, frm="v2", to="v3", phase="Phases 3+4 — Embeddings & Vector Database", core=True,
-         concepts=[
-             ("Vector representations", "`/similarity-demo` ranks toy vectors by cosine similarity.", "/similarity-demo"),
-             ("Embedding models", "`/embed` turns text into a real vector.", "/embed"),
-             ("Semantic search", "`/semantic-search` ranks docs by meaning, not words.", "/semantic-search"),
-             ("Indexing", "`/notes/upload` chunks and stores notes in ChromaDB.", "/notes/upload"),
-             ("Similarity search", "`/notes/search` retrieves chunks, with metadata filtering.", "/notes/search"),
-         ]),
-    dict(n=4, frm="v3", to="v4", phase="Phase 5 — RAG", core=True,
-         concepts=[
-             ("Retrieval + generation", "`/ask` now retrieves notes and answers only from them.", "ask()"),
-             ("Grounding + citations", "The answer must cite `[Chunk N — file]`.", "ask()"),
-             ("Refusal", "No relevant note → it says so instead of guessing.", "ask()"),
-         ]),
-    dict(n=5, frm="v4", to="v5", phase="Phase 6 — Agents & Tools", core=False,
+    dict(n=3, frm="v2", to="v3", phase="Phase 3 — Agents & Tools", core=True,
          concepts=[
              ("Tools + function calling", "Real functions in `TOOL_REGISTRY` are executed.", "/agent/ask"),
              ("ReAct loop", "Think → act → observe, with a visible trace.", "/agent/ask"),
              ("Agent loops", "Stop conditions: step cap + repeat detection.", "app/agent.py"),
              ("Multi-agent", "Planner → executor → critic.", "/agent/plan-and-execute"),
          ]),
-    dict(n=6, frm="v5", to="v6", phase="Phase 7 — MCP", core=False,
+    dict(n=4, frm="v3", to="v4", phase="Phase 4 — MCP", core=False,
          concepts=[
              ("Servers / tools / resources", "Tools and the notes corpus exposed over MCP.", "mcp_server/server.py"),
              ("Clients", "Study Buddy discovers tools via `/mcp/tools`.", "/mcp/tools"),
          ]),
-    dict(n=7, frm="v6", to="v7", phase="Phase 8 — AI Safety", core=False,
+    dict(n=5, frm="v4", to="v5", phase="Phase 5 — AI Safety", core=False,
          concepts=[
-             ("Prompt injection", "Retrieved chunks are fenced as untrusted data.", "ask()"),
+             ("Prompt injection", "Obvious injections are stripped before the model sees them.", "ask()"),
              ("Privacy", "Emails / phones / cards are redacted before sending.", "ask()"),
              ("Moderation", "Input and output are checked by `moderate()`.", "ask()"),
          ]),
-    dict(n=8, frm="v7", to="v8", phase="Phase 9 — Evaluation & Observability", core=False,
+    dict(n=6, frm="v5", to="v6", phase="Phase 6 — Evaluation & Observability", core=False,
          concepts=[
-             ("Groundedness report", "Pass rate over logged groundedness checks.", "/eval/groundedness-report"),
              ("Regression report", "A built-in eval set scored against the running app.", "/eval/regression-report"),
          ]),
 ]
@@ -96,7 +81,7 @@ def main() -> None:
         "- Clone A: `git switch -c live v0` — this is where you paste, step by step. Never switch it.\n"
         "- Clone B: read-only; run `git checkout vN` here to show the finished result of each step.\n"
         "- Both: `pip install -r requirements.txt` once, and copy `.env` with your key.\n"
-        "- Before each run: `python scripts/workshop_reset.py` to clear notes/session state.\n\n"
+        "- Before each run: `python scripts/workshop_reset.py` to clear session state.\n\n"
         "Each step below shows the **exact diff** of `app/main.py`. Type the `+` lines into "
         "Clone A. If a live paste goes wrong, run the matching `workshop/patches/stepN.patch` "
         "with `git apply`. Concepts are numbered so you can explain as you paste.\n"
@@ -122,11 +107,11 @@ def main() -> None:
     out.append(
         "\n---\n\n## Show the product was built sequentially\n\n"
         "```bash\n"
-        "git diff v0 v4 -- app/main.py     # what the first four steps added, together\n"
-        "git log --oneline v0..v4          # (tags are snapshots, not a linear log)\n"
+        "git diff v0 v3 -- app/main.py     # what the first three steps added, together\n"
+        "git log --oneline v0..v3          # (tags are snapshots, not a linear log)\n"
         "```\n\n"
-        "At the end: `git checkout v8` in Clone B to preview everything beyond the core "
-        "(agents, MCP, safety, evals).\n"
+        "At the end: `git checkout v6` in Clone B to preview everything beyond the core "
+        "(MCP, safety, evals).\n"
     )
 
     guide = GUIDE_DIR / "PASTE_GUIDE.md"

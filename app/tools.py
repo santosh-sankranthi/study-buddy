@@ -6,7 +6,7 @@ Grows through the phases:
 """
 
 # ──────────────────────────────────────────────────────────────────────────────
-# CONCEPT · Function calling & tools  [Phase 1.5 schemas / Phase 6 execution]
+# CONCEPT · Function calling & tools  [Phase 1.5 schemas / Phase 3 execution]
 # The JSON schemas tell the model what it may call; TOOL_REGISTRY maps those
 # names to real Python functions that the agent loop actually executes.
 # Wired into: /tools (list schemas), /agent/ask (execute), mcp_server/ (expose via MCP).
@@ -81,19 +81,29 @@ TOOLS: list[dict] = [
 # (These are no-ops until Phase 6; importing this file in Phase 1–5 is safe.)
 
 def search_notes(query: str) -> str:
-    """Search the student's indexed notes via vector similarity.
+    """Search the sample study notes by simple keyword match.
 
-    Phase 6 wires this to app.vector_store.retrieve(). Before that, returns
-    a placeholder so the tool can be listed without crashing.
+    Deliberately boring: return the notes whose text contains any keyword from
+    the query. No embeddings, no database -- so the agent's tool stays obvious
+    and explainable.
     """
-    try:
-        from app.vector_store import retrieve
-        results = retrieve(query, k=2)
-        if not results:
-            return "No relevant notes found for that query."
-        return "\n\n".join(r["text"] for r in results)
-    except ImportError:
-        return f"[search_notes not yet wired — Phase 4+ needed] query={query!r}"
+    import re
+    from pathlib import Path
+
+    notes_dir = Path(__file__).resolve().parent.parent / "data" / "sample_notes"
+    words = [w for w in re.findall(r"\w+", query.lower()) if len(w) > 2]
+    if not words or not notes_dir.exists():
+        return "No relevant notes found for that query."
+
+    hits: list[str] = []
+    for path in sorted(notes_dir.glob("*.md")):
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        if any(w in text.lower() for w in words):
+            snippet = text.strip().replace("\n", " ")[:300]
+            hits.append(f"[{path.name}] {snippet}")
+        if len(hits) >= 3:
+            break
+    return "\n\n".join(hits) if hits else "No relevant notes found for that query."
 
 
 def get_exam_schedule(subject: str) -> str:

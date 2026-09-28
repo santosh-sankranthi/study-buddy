@@ -7,12 +7,10 @@ Phase progression:
   v0  — raw one-shot Q&A (the starting point)
   v1  — system prompts, CoT, structured output (/modes, /flashcards, /quiz-item, /study-plan, /tools)
   v2  — session memory, context compaction, context report, long-context measurement
-  v3  — embeddings + vector database (/embed, /similarity-demo, /semantic-search, /notes/*)
-  v4  — grounded RAG in /ask
-  v5  — agents (/agent/ask, /agent/plan-and-execute)
-  v6  — MCP (/mcp/tools)
-  v7  — security middleware (injection, PII, moderation)
-  v8  — evaluation endpoints (/eval/groundedness-report, /eval/regression-report)
+  v3  — agents (/agent/ask, /agent/plan-and-execute)
+  v4  — MCP (/mcp/tools)
+  v5  — security middleware (injection, PII, moderation)
+  v6  — evaluation endpoint (/eval/regression-report)
 
 How to read this file
   Every meaningful block is prefixed with a comment banner:
@@ -66,7 +64,7 @@ class AskResponse(BaseModel):
     answer: str
 
 # ────────────────────────────────────────────────────────────────────────────
-# CONCEPT · /ask — the core endpoint  [Phase 0-9]
+# CONCEPT · /ask — the core endpoint  [Phase 0-6]
 # One question in, one answer out. Each phase adds one step inside this function.
 # ────────────────────────────────────────────────────────────────────────────
 

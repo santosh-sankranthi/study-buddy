@@ -57,4 +57,4 @@ Published by Yao et al. (2022), **ReAct** interleaves reasoning (*Thought*) and 
 7. **Thought:** I have both the exam date and the relevant review topics. I can formulate the final answer.
 8. **Action:** `FINISH(answer="Your Biology exam is on November 15, 2026 (48 days away). You should review Cell Respiration, Photosynthesis, and Genetics.")`
 
-In Phase 6, our FastAPI app will execute this entire loop autonomously with real LLM tool calls.
+In Phase 3, our FastAPI app will execute this entire loop autonomously with real LLM tool calls.

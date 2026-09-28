@@ -8,7 +8,7 @@ Grows through the phases:
 """
 
 # ──────────────────────────────────────────────────────────────────────────────
-# CONCEPT · Agents  [Phase 6]
+# CONCEPT · Agents  [Phase 3]
 # The model decides which tool to call; we execute it and feed the result back.
 # react_step() is one think->act->observe turn; agent_loop() repeats with a step
 # cap and repeat-detection; plan_and_execute() runs planner -> executor -> critic.

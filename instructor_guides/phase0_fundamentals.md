@@ -21,7 +21,7 @@ uvicorn app.main:app --reload                # open http://127.0.0.1:8000
 3. Ask the same question at temperature extremes (see the sampling demo).
    - Same prompt, different answer every time. (Motivates Sampling.)
 
-Restore the full app when done: `python scripts/switch_version.py v8`.
+Restore the full app when done: `python scripts/switch_version.py v6`.
 
 ## Learning objectives
 
@@ -108,4 +108,4 @@ experiment varying `top_p` instead, and report the behavioural difference.
   the current prompt. Clear the session and it reverts.
 - **What would permanently change the model's behaviour?** Fine-tuning via
   gradient descent (or a new pre-training/RLHF run) — expensive, offline, and
-  rarely the right first answer (that is what RAG in Phase 5 is for).
+  rarely the right first answer (curating the prompt is cheaper and faster).

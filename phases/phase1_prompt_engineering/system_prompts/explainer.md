@@ -26,7 +26,7 @@ a roll of the dice in terms of tone and format.
 - The system prompt is **not** privileged at the model level — it is just the
   first message, tagged `"role": "system"`. The model was fine-tuned to follow
   system prompts, but it is not technically impossible to override them (that is
-  the whole problem with prompt injection, which Phase 8 addresses).
+  the whole problem with prompt injection, which Phase 5 addresses).
 - **Specificity beats length.** A 3-line system prompt with concrete rules
   ("keep replies under 4 sentences", "end with an encouraging phrase") beats a
   2-page philosophical description of who the tutor should be.
