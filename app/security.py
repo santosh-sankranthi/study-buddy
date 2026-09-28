@@ -7,6 +7,14 @@ Grows through the phases:
   Phase 8.4 — moderate()
 """
 
+# ──────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Prompt injection, PII & moderation  [Phase 2.5 light / Phase 8 full]
+# Defences for untrusted text: strip injected instructions (sanitize_input),
+# redact personal data (scrub_pii), fence retrieved chunks as data
+# (wrap_chunk_as_untrusted), and moderate input + output (moderate).
+# Wired into: /ask.
+# ──────────────────────────────────────────────────────────────────────────────
+
 from __future__ import annotations
 
 import os

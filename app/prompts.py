@@ -7,6 +7,13 @@ Instructor: this file grows every phase.
   Phase 1.4 — schemas live in app/schemas.py
 """
 
+# ──────────────────────────────────────────────────────────────────────────────
+# CONCEPT · System prompts & few-shot  [Phase 1]
+# This is where the tutor's personality lives. A `system` message fixes who the
+# model is and the rules it follows; few-shot examples fix the output format.
+# Wired into: /ask (build_system) and /quiz-item (build_few_shot_prompt).
+# ──────────────────────────────────────────────────────────────────────────────
+
 from __future__ import annotations
 
 from datetime import datetime

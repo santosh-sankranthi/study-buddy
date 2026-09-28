@@ -4,6 +4,13 @@ Builds the augmented prompt that instructs the model to answer ONLY from
 retrieved context and to cite its sources.
 """
 
+# ──────────────────────────────────────────────────────────────────────────────
+# CONCEPT · RAG — grounded generation  [Phase 5.4]
+# Build the augmented prompt: answer ONLY from the retrieved chunks, cite the
+# source, and refuse when the context does not cover the question.
+# Wired into: /ask when retrieval finds relevant notes.
+# ──────────────────────────────────────────────────────────────────────────────
+
 from __future__ import annotations
 
 from app.security import wrap_chunk_as_untrusted

@@ -6,6 +6,14 @@ Grows through the phases:
   Phase 2.3 — summarize(), compact_if_needed(), compact_keep_last2()
 """
 
+# ──────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Memory & context compaction  [Phase 2.2-2.3]
+# The model is stateless, so "memory" is just history we re-send. This module
+# stores it per session, trims it to a token budget, and summarises the oldest
+# half when it grows too long (compaction).
+# Wired into: /ask and the /session/{id} endpoints.
+# ──────────────────────────────────────────────────────────────────────────────
+
 from __future__ import annotations
 
 from collections import defaultdict

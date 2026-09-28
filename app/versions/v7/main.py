@@ -13,6 +13,16 @@ Phase progression:
   v6  — MCP (/mcp/tools)
   v7  — security middleware (injection, PII, moderation)
   v8  — evaluation endpoints (/eval/groundedness-report, /eval/regression-report)
+
+How to read this file
+  Every meaningful block is prefixed with a comment banner:
+
+      # CONCEPT · <name>  [<phase>]
+      # <one line on what this block does, and what was broken before it>
+
+  The banners are the lesson map. Read them in order and the file's growth is
+  the whole workshop. Helper logic lives in the `app/` modules and is imported,
+  not re-written here -- so this file stays about *wiring concepts together*.
 """
 
 from __future__ import annotations
@@ -47,6 +57,11 @@ STATIC_DIR = _APP_DIR / "static"
 
 app = FastAPI(title="Study Buddy", version="v7")
 
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · API request / response contract  [Phase 1.4]
+# Pydantic types the request we accept and the response we return.
+# ────────────────────────────────────────────────────────────────────────────
+
 class AskRequest(BaseModel):
     question:         str
     mode:             str        = "tutor"
@@ -75,11 +90,17 @@ class AskResponse(BaseModel):
     pii_types:          list[str] = []
     compacted:          bool = False
 
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · /ask — the core endpoint  [Phase 0-9]
+# One question in, one answer out. Each phase adds one step inside this function.
+# ────────────────────────────────────────────────────────────────────────────
+
 @app.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest) -> AskResponse:
     """Send a question to Study Buddy. Behaviour grows phase by phase."""
 
-    # ── Phase 7: Security — sanitize input ──────────────────────────────────
+    # ── CONCEPT · Prompt injection + PII [Phase 8] ───────────────────────────
+    # Strip injected instructions and redact personal data before anything runs.
     question           = request.question
     injection_detected = False
     pii_detected       = False
@@ -97,7 +118,8 @@ def ask(request: AskRequest) -> AskResponse:
                 detail=f"Request blocked by content policy. Categories: {input_mod.get('categories', {})}",
             )
 
-    # ── Phase 2.2: Memory — compact, then load session history ───────────────
+    # ── CONCEPT · Memory [Phase 2.2] ─────────────────────────────────────────
+    # Reload earlier turns so the tutor remembers. Compaction shrinks long history.
     compacted = False
     history: list[dict] = []
     if request.session_id:
@@ -110,14 +132,16 @@ def ask(request: AskRequest) -> AskResponse:
             compacted = compact_if_needed(request.session_id)
         history = get_history(request.session_id)
 
-    # ── Phase 1.1: System prompt ─────────────────────────────────────────────
+    # ── CONCEPT · System prompt [Phase 1.1] ──────────────────────────────────
+    # Prepend a `system` message: who the tutor is and the rules it must follow.
     system_content = build_system(
         mode=request.mode,
         student_name=request.student_name,
         study_goal=request.study_goal,
     )
 
-    # ── Phase 4+: RAG retrieval ──────────────────────────────────────────────
+    # ── CONCEPT · Retrieval [Phase 5] ────────────────────────────────────────
+    # Semantic-search the notes for the most relevant chunks; None = nothing close.
     grounded = False
     sources: list[str] = []
     rag_chunks: list[dict] = []
@@ -133,7 +157,8 @@ def ask(request: AskRequest) -> AskResponse:
         except Exception:  # noqa: BLE001 — RAG not set up yet is fine
             pass
 
-    # ── Build the messages list ──────────────────────────────────────────────
+    # ── CONCEPT · Grounded generation [Phase 5] ──────────────────────────────
+    # If we retrieved notes, build a prompt that answers ONLY from those chunks.
     if grounded and rag_chunks:
         from app.rag import build_rag_prompt
         messages = build_rag_prompt(question, rag_chunks)
@@ -146,7 +171,7 @@ def ask(request: AskRequest) -> AskResponse:
             messages.append({"role": "system", "content": system_content})
         messages += history
 
-        # Phase 1.3: CoT injection.
+        # CONCEPT · Chain of thought: ask for step-by-step reasoning.
         user_content = question
         if request.cot:
             user_content += (
@@ -156,7 +181,8 @@ def ask(request: AskRequest) -> AskResponse:
             )
         messages.append({"role": "user", "content": user_content})
 
-    # No relevant notes found — refuse rather than hallucinate.
+    # ── CONCEPT · Refusal [Phase 5] ──────────────────────────────────────────
+    # Notes exist but nothing matched: say "I don't know" instead of guessing.
     if request.enable_rag and not grounded:
         try:
             from app.vector_store import count
@@ -174,20 +200,21 @@ def ask(request: AskRequest) -> AskResponse:
         except Exception:  # noqa: BLE001
             pass
 
-    # ── Phase 2.1: Context accounting ────────────────────────────────────────
+    # ── CONCEPT · Context window [Phase 2.1] ─────────────────────────────────
+    # Measure the tokens the prompt uses and warn before we hit the model's limit.
     ctx_warning = context_budget_warning(messages)
     ctx_report  = context_report(messages)
 
-    # ── Call the LLM ─────────────────────────────────────────────────────────
+    # ── The model call itself (the one thing v0 already did) ─────────────────
     raw_answer = chat(messages, temperature=request.temperature, top_p=request.top_p)
 
-    # ── Phase 7: Moderate output ─────────────────────────────────────────────
+    # ── CONCEPT · Moderation [Phase 8] — check the model's output too ────────
     if request.enable_security:
         out_mod = moderate(raw_answer)
         if out_mod.get("flagged"):
             raw_answer = "[Response blocked by content policy.]"
 
-    # ── Phase 1.3: Parse CoT tags ────────────────────────────────────────────
+    # ── CONCEPT · Chain of thought — separate reasoning from the answer ──────
     thinking: str | None = None
     final_answer = raw_answer
     if request.cot:
@@ -198,7 +225,7 @@ def ask(request: AskRequest) -> AskResponse:
         if a_match:
             final_answer = a_match.group(1).strip()
 
-    # ── Phase 2.2: Save to memory ────────────────────────────────────────────
+    # ── CONCEPT · Memory — store this turn so the next one remembers it ──────
     if request.session_id:
         append(request.session_id, "user", question)
         append(request.session_id, "assistant", final_answer)
@@ -219,9 +246,19 @@ def ask(request: AskRequest) -> AskResponse:
         compacted=compacted,
     )
 
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Personas / modes  [Phase 1.1]
+# List the tutor personas the frontend can choose from.
+# ────────────────────────────────────────────────────────────────────────────
+
 @app.get("/modes")
 def list_modes() -> list[str]:
     return ["tutor", "direct", "flashcard"]
+
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Few-shot  [Phase 1.2]
+# Two worked Q&A -> MCQ examples fix the JSON shape of /quiz-item.
+# ────────────────────────────────────────────────────────────────────────────
 
 QUIZ_EXAMPLES = [
     {
@@ -260,6 +297,11 @@ def make_quiz_item(body: dict) -> dict:
 
     return item.model_dump()
 
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Structured output  [Phase 1.4]
+# Pydantic validates the model's JSON, or raises ValidationError.
+# ────────────────────────────────────────────────────────────────────────────
+
 @app.post("/flashcards")
 def make_flashcards(body: dict) -> dict:
     topic = body.get("topic", "")
@@ -276,6 +318,11 @@ def make_flashcards(body: dict) -> dict:
     raw  = chat(messages, temperature=0.3)
     card = Flashcard.model_validate_json(raw)
     return card.model_dump()
+
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Structured output (a list)  [Phase 1.4]
+# A multi-day plan validated against StudyPlanDay and a time budget.
+# ────────────────────────────────────────────────────────────────────────────
 
 @app.post("/study-plan")
 def make_study_plan(body: dict) -> list:
@@ -307,9 +354,19 @@ def make_study_plan(body: dict) -> list:
         )
     return [d.model_dump() for d in plan]
 
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Function calling (schemas)  [Phase 1.5]
+# Publish the JSON tool contracts; nothing is executed yet.
+# ────────────────────────────────────────────────────────────────────────────
+
 @app.get("/tools")
 def list_tools() -> list:
     return TOOLS
+
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Context sources  [Phase 2.1]
+# Show where the prompt's tokens go, broken down by role.
+# ────────────────────────────────────────────────────────────────────────────
 
 @app.get("/context-report")
 def get_context_report(session_id: str | None = None) -> dict:
@@ -318,6 +375,11 @@ def get_context_report(session_id: str | None = None) -> dict:
         from app.memory import get_history
         messages = get_history(session_id)
     return context_report(messages)
+
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Memory (API)  [Phase 2.2]
+# Read or clear a session's stored conversation.
+# ────────────────────────────────────────────────────────────────────────────
 
 @app.get("/session/{session_id}/history")
 def get_session_history(session_id: str) -> list:
@@ -330,6 +392,11 @@ def clear_session(session_id: str) -> dict:
     from app.memory import clear
     clear(session_id)
     return {"cleared": True, "session_id": session_id}
+
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Long context  [Phase 2.4]
+# Measure latency and cost as the pasted document grows.
+# ────────────────────────────────────────────────────────────────────────────
 
 @app.post("/measure-long-context")
 def measure_long_context(body: dict) -> list:
@@ -360,11 +427,21 @@ def measure_long_context(body: dict) -> list:
         })
     return results
 
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Embeddings  [Phase 3.2]
+# Turn text into a vector; return its size and a preview.
+# ────────────────────────────────────────────────────────────────────────────
+
 @app.post("/embed")
 def embed_endpoint(body: dict) -> dict:
     from app.embeddings import embed
     vec = embed(body.get("text", ""))
     return {"dimensions": len(vec), "preview": vec[:10], "vector": vec}
+
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Vector representations  [Phase 3.1]
+# Rank toy vectors by cosine similarity -- the idea, by hand.
+# ────────────────────────────────────────────────────────────────────────────
 
 @app.get("/similarity-demo")
 def similarity_demo() -> list:
@@ -373,10 +450,20 @@ def similarity_demo() -> list:
     ranked = rank_by_similarity(query_vec, DEMO_VECS)
     return [{"text": t, "score": round(s, 4)} for t, s in ranked]
 
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Semantic search  [Phase 3.3]
+# Rank documents by meaning, not by exact words.
+# ────────────────────────────────────────────────────────────────────────────
+
 @app.post("/semantic-search")
 def semantic_search_endpoint(body: dict) -> list:
     from app.search import semantic_search
     return semantic_search(body.get("query", ""), body.get("docs", []), int(body.get("k", 3)))
+
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Indexing  [Phase 4.1]
+# Chunk notes and store their vectors in ChromaDB.
+# ────────────────────────────────────────────────────────────────────────────
 
 @app.post("/notes/upload")
 def upload_note(body: dict) -> dict:
@@ -404,10 +491,20 @@ def upload_note(body: dict) -> dict:
         "total_docs":     count(),
     }
 
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Similarity search  [Phase 4.2]
+# Query the vector store, optionally filtered by subject.
+# ────────────────────────────────────────────────────────────────────────────
+
 @app.post("/notes/search")
 def search_notes_endpoint(body: dict) -> list:
     from app.vector_store import search
     return search(body.get("query", ""), k=int(body.get("k", 3)), subject=body.get("subject"))
+
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Agents  [Phase 6]
+# A ReAct loop that calls tools, plus a planner->executor->critic pipeline.
+# ────────────────────────────────────────────────────────────────────────────
 
 @app.post("/agent/ask")
 def agent_ask(body: dict) -> dict:
@@ -420,6 +517,11 @@ def agent_plan_and_execute(body: dict) -> dict:
     from app.agent import plan_and_execute
     return plan_and_execute(body.get("question", ""))
 
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · MCP  [Phase 7]
+# List tools discovered from the MCP server over stdio.
+# ────────────────────────────────────────────────────────────────────────────
+
 @app.get("/mcp/tools")
 def mcp_tools() -> list:
     """List tools discovered from the Study Buddy MCP server (Phase 7)."""
@@ -428,6 +530,11 @@ def mcp_tools() -> list:
         return list_mcp_tools()
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=503, detail=f"MCP server unavailable: {exc}")
+
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Frontend  [all phases]
+# Serve the single-page UI; every phase of the workshop is driven through it.
+# ────────────────────────────────────────────────────────────────────────────
 
 @app.get("/")
 def index() -> FileResponse:

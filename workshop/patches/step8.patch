@@ -1,0 +1,82 @@
+diff --git a/app/main.py b/app/main.py
+index a05fe65..9a2f2c8 100644
+--- a/app/main.py
++++ b/app/main.py
+@@ -21,6 +21,7 @@ import sys
+ import re
+ import time
+ import urllib.request
++import json
+ from pathlib import Path
+ 
+ # Locate the app package by walking up from this file, so this module works
+@@ -45,7 +46,7 @@ from app.security import moderate, sanitize_input, scrub_pii
+ 
+ STATIC_DIR = _APP_DIR / "static"
+ 
+-app = FastAPI(title="Study Buddy", version="v7")
++app = FastAPI(title="Study Buddy", version="v8")
+ 
+ class AskRequest(BaseModel):
+     question:         str
+@@ -429,6 +430,60 @@ def mcp_tools() -> list:
+     except Exception as exc:  # noqa: BLE001
+         raise HTTPException(status_code=503, detail=f"MCP server unavailable: {exc}")
+ 
++@app.get("/eval/groundedness-report")
++def groundedness_report() -> dict:
++    log_path = Path("./data/groundedness_log.jsonl")
++    if not log_path.exists():
++        return {"checked": 0, "passed": 0, "pass_rate": 0.0}
++    lines  = [json.loads(line) for line in log_path.read_text().splitlines() if line.strip()]
++    passed = sum(1 for line in lines if line.get("grounded"))
++    return {
++        "checked":   len(lines),
++        "passed":    passed,
++        "pass_rate": round(passed / len(lines), 3) if lines else 0.0,
++    }
++
++EVAL_SET = [
++    {"question": "What is photosynthesis?",              "check": lambda r: "light" in r.lower() or "energy" in r.lower()},
++    {"question": "Where does photosynthesis occur?",     "check": lambda r: "chloro" in r.lower()},
++    {"question": "What gas does photosynthesis release?", "check": lambda r: "oxygen" in r.lower() or "o2" in r.lower()},
++    {"question": "What is Newton's second law?",         "check": lambda r: "f" in r.lower() and "m" in r.lower()},
++    {"question": "What is cellular respiration?",        "check": lambda r: "energy" in r.lower() or "atp" in r.lower()},
++]
++
++
++@app.get("/eval/regression-report")
++def regression_report() -> dict:
++    """Run a mini built-in eval set against a locally running server."""
++    passed  = 0
++    results = []
++    for case in EVAL_SET:
++        try:
++            payload = json.dumps({
++                "question":   case["question"],
++                "mode":       "direct",
++                "enable_rag": False,
++            }).encode()
++            req = urllib.request.Request(
++                "http://localhost:8000/ask",
++                data=payload,
++                headers={"Content-Type": "application/json"},
++            )
++            with urllib.request.urlopen(req, timeout=15) as resp:  # noqa: S310
++                answer = json.loads(resp.read()).get("answer", "")
++            ok = case["check"](answer)
++            passed += int(ok)
++            results.append({"question": case["question"], "passed": ok})
++        except Exception as exc:  # noqa: BLE001
++            results.append({"question": case["question"], "passed": False, "error": str(exc)})
++
++    return {
++        "total":     len(EVAL_SET),
++        "passed":    passed,
++        "pass_rate": round(passed / len(EVAL_SET), 3),
++        "details":   results,
++    }
++
+ @app.get("/")
+ def index() -> FileResponse:
+     return FileResponse(STATIC_DIR / "index.html")

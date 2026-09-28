@@ -6,6 +6,14 @@ Grows through the phases:
   Phase 5.3 — retrieve() with min_similarity threshold
 """
 
+# ──────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Vector database  [Phase 4]
+# A persistent, embedded ChromaDB collection: store vectors with metadata,
+# search them by similarity, and filter by metadata. retrieve() adds the
+# minimum-similarity threshold that lets RAG say "nothing relevant".
+# Wired into: /notes/upload, /notes/search, and /ask (retrieval).
+# ──────────────────────────────────────────────────────────────────────────────
+
 from __future__ import annotations
 
 import uuid

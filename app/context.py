@@ -4,6 +4,13 @@ Grows through the phases:
   Phase 2.1 — context_report(), context_budget_warning()
 """
 
+# ──────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Context window  [Phase 2.1]
+# The context window is a hard token budget (input + output). This module counts
+# where the prompt's tokens go and warns before we reach the limit.
+# Wired into: /ask (context_report, context_budget_warning), /context-report.
+# ──────────────────────────────────────────────────────────────────────────────
+
 from __future__ import annotations
 
 from common.tokens import count_tokens

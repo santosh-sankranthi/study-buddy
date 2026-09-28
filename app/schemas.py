@@ -4,6 +4,13 @@ Grows through the phases:
   Phase 1.4 — Flashcard, StudyPlanDay, QuizItem
 """
 
+# ──────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Structured output  [Phase 1.4]
+# Pydantic classes that define the exact shape we require from the model. If the
+# model's JSON does not match, validation raises instead of silently misbehaving.
+# Wired into: /flashcards (Flashcard), /study-plan (StudyPlanDay), /quiz-item (QuizItem).
+# ──────────────────────────────────────────────────────────────────────────────
+
 from __future__ import annotations
 
 from typing import Literal

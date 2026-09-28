@@ -7,6 +7,14 @@ Grows through the phases:
   Phase 6.5 — planner(), executor(), critic(), plan_and_execute()
 """
 
+# ──────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Agents  [Phase 6]
+# The model decides which tool to call; we execute it and feed the result back.
+# react_step() is one think->act->observe turn; agent_loop() repeats with a step
+# cap and repeat-detection; plan_and_execute() runs planner -> executor -> critic.
+# Wired into: /agent/ask and /agent/plan-and-execute.
+# ──────────────────────────────────────────────────────────────────────────────
+
 from __future__ import annotations
 
 import json

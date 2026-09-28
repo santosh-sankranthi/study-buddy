@@ -4,6 +4,13 @@ Uses embed() + cosine_similarity() from app.embeddings to rank documents.
 No vector DB here — that comes in Phase 4 with ChromaDB.
 """
 
+# ──────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Semantic search  [Phase 3.3]
+# Rank a list of documents by how close their embeddings are to the query --
+# no database yet, just embed + cosine similarity.
+# Wired into: /semantic-search.
+# ──────────────────────────────────────────────────────────────────────────────
+
 from __future__ import annotations
 
 from app.embeddings import cosine_similarity, embed, embed_batch

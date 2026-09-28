@@ -1,0 +1,144 @@
+diff --git a/app/main.py b/app/main.py
+index 7b5a913..a05fe65 100644
+--- a/app/main.py
++++ b/app/main.py
+@@ -41,10 +41,11 @@ from app.prompts import build_few_shot_prompt, build_system
+ from app.schemas import Flashcard, QuizItem, StudyPlanDay
+ from app.tools import TOOLS
+ from app.context import context_budget_warning, context_report
++from app.security import moderate, sanitize_input, scrub_pii
+ 
+ STATIC_DIR = _APP_DIR / "static"
+ 
+-app = FastAPI(title="Study Buddy", version="v6")
++app = FastAPI(title="Study Buddy", version="v7")
+ 
+ class AskRequest(BaseModel):
+     question:         str
+@@ -57,23 +58,45 @@ class AskRequest(BaseModel):
+     study_goal:       str | None = None
+     compact_strategy: str        = "halve"   # "halve" | "keep_last2"
+     enable_rag:       bool       = True      # Phase 4+
++    enable_security:  bool       = True      # Phase 7+
+ 
+ 
+ class AskResponse(BaseModel):
+-    answer:          str
+-    thinking:        str | None = None
+-    grounded:        bool = False
+-    sources:         list[str] = []
+-    input_tokens:    int = 0
+-    output_tokens:   int = 0
+-    context_report:  dict = {}
+-    context_warning: str | None = None
+-    compacted:       bool = False
++    answer:             str
++    thinking:           str | None = None
++    grounded:           bool = False
++    sources:            list[str] = []
++    input_tokens:       int = 0
++    output_tokens:      int = 0
++    context_report:     dict = {}
++    context_warning:    str | None = None
++    injection_detected: bool = False
++    pii_detected:       bool = False
++    pii_types:          list[str] = []
++    compacted:          bool = False
+ 
+ @app.post("/ask", response_model=AskResponse)
+ def ask(request: AskRequest) -> AskResponse:
+     """Send a question to Study Buddy. Behaviour grows phase by phase."""
+ 
++    # ── Phase 7: Security — sanitize input ──────────────────────────────────
++    question           = request.question
++    injection_detected = False
++    pii_detected       = False
++    pii_types: list[str] = []
++
++    if request.enable_security:
++        question, injection_detected = sanitize_input(question)
++        question, pii_types          = scrub_pii(question)
++        pii_detected                 = bool(pii_types)
++
++        input_mod = moderate(question)
++        if input_mod.get("flagged"):
++            raise HTTPException(
++                status_code=422,
++                detail=f"Request blocked by content policy. Categories: {input_mod.get('categories', {})}",
++            )
++
+     # ── Phase 2.2: Memory — compact, then load session history ───────────────
+     compacted = False
+     history: list[dict] = []
+@@ -102,7 +125,7 @@ def ask(request: AskRequest) -> AskResponse:
+         try:
+             from app.vector_store import retrieve
+             from app.rag import extract_sources
+-            chunks = retrieve(request.question, k=3)
++            chunks = retrieve(question, k=3)
+             if chunks:
+                 rag_chunks = chunks
+                 sources    = extract_sources(chunks)
+@@ -113,7 +136,7 @@ def ask(request: AskRequest) -> AskResponse:
+     # ── Build the messages list ──────────────────────────────────────────────
+     if grounded and rag_chunks:
+         from app.rag import build_rag_prompt
+-        messages = build_rag_prompt(request.question, rag_chunks)
++        messages = build_rag_prompt(question, rag_chunks)
+         # Prepend history before the RAG user message.
+         if history:
+             messages = [messages[0]] + history + [messages[1]]
+@@ -124,7 +147,7 @@ def ask(request: AskRequest) -> AskResponse:
+         messages += history
+ 
+         # Phase 1.3: CoT injection.
+-        user_content = request.question
++        user_content = question
+         if request.cot:
+             user_content += (
+                 "\n\nThink step by step before answering. "
+@@ -141,8 +164,11 @@ def ask(request: AskRequest) -> AskResponse:
+                 return AskResponse(
+                     answer="I don't have enough information in your notes to answer this.",
+                     grounded=False,
+-                    input_tokens=count_tokens(request.question),
++                    input_tokens=count_tokens(question),
+                     context_report=context_report(messages),
++                    injection_detected=injection_detected,
++                    pii_detected=pii_detected,
++                    pii_types=pii_types,
+                     compacted=compacted,
+                 )
+         except Exception:  # noqa: BLE001
+@@ -155,6 +181,12 @@ def ask(request: AskRequest) -> AskResponse:
+     # ── Call the LLM ─────────────────────────────────────────────────────────
+     raw_answer = chat(messages, temperature=request.temperature, top_p=request.top_p)
+ 
++    # ── Phase 7: Moderate output ─────────────────────────────────────────────
++    if request.enable_security:
++        out_mod = moderate(raw_answer)
++        if out_mod.get("flagged"):
++            raw_answer = "[Response blocked by content policy.]"
++
+     # ── Phase 1.3: Parse CoT tags ────────────────────────────────────────────
+     thinking: str | None = None
+     final_answer = raw_answer
+@@ -168,7 +200,7 @@ def ask(request: AskRequest) -> AskResponse:
+ 
+     # ── Phase 2.2: Save to memory ────────────────────────────────────────────
+     if request.session_id:
+-        append(request.session_id, "user", request.question)
++        append(request.session_id, "user", question)
+         append(request.session_id, "assistant", final_answer)
+ 
+     input_tokens = count_tokens(" ".join(m.get("content") or "" for m in messages))
+@@ -181,6 +213,9 @@ def ask(request: AskRequest) -> AskResponse:
+         output_tokens=count_tokens(final_answer),
+         context_report=ctx_report,
+         context_warning=ctx_warning,
++        injection_detected=injection_detected,
++        pii_detected=pii_detected,
++        pii_types=pii_types,
+         compacted=compacted,
+     )
+ 

@@ -1,0 +1,69 @@
+diff --git a/app/main.py b/app/main.py
+index 7210b63..481be92 100644
+--- a/app/main.py
++++ b/app/main.py
+@@ -44,7 +44,7 @@ from app.context import context_budget_warning, context_report
+ 
+ STATIC_DIR = _APP_DIR / "static"
+ 
+-app = FastAPI(title="Study Buddy", version="v2")
++app = FastAPI(title="Study Buddy", version="v3")
+ 
+ class AskRequest(BaseModel):
+     question:         str
+@@ -281,6 +281,55 @@ def measure_long_context(body: dict) -> list:
+         })
+     return results
+ 
++@app.post("/embed")
++def embed_endpoint(body: dict) -> dict:
++    from app.embeddings import embed
++    vec = embed(body.get("text", ""))
++    return {"dimensions": len(vec), "preview": vec[:10], "vector": vec}
++
++@app.get("/similarity-demo")
++def similarity_demo() -> list:
++    from app.embeddings import DEMO_VECS, rank_by_similarity
++    query_vec = [0.88, 0.12, 0.14]  # close to the photosynthesis cluster
++    ranked = rank_by_similarity(query_vec, DEMO_VECS)
++    return [{"text": t, "score": round(s, 4)} for t, s in ranked]
++
++@app.post("/semantic-search")
++def semantic_search_endpoint(body: dict) -> list:
++    from app.search import semantic_search
++    return semantic_search(body.get("query", ""), body.get("docs", []), int(body.get("k", 3)))
++
++@app.post("/notes/upload")
++def upload_note(body: dict) -> dict:
++    from app.chunker import chunk_fixed, chunk_paragraph
++    from app.vector_store import count, index_document
++
++    filename = body.get("filename", "untitled.md")
++    content  = body.get("content", "")
++    subject  = body.get("subject", "general")
++    strategy = body.get("chunk_strategy", "fixed")   # "fixed" | "paragraph"
++
++    chunks = chunk_paragraph(content) if strategy == "paragraph" else chunk_fixed(content)
++    if not chunks:
++        chunks = [content]
++
++    for i, chunk in enumerate(chunks):
++        index_document(
++            chunk,
++            metadata={"filename": filename, "subject": subject, "chunk_index": i},
++        )
++    return {
++        "indexed":        True,
++        "filename":       filename,
++        "chunks_created": len(chunks),
++        "total_docs":     count(),
++    }
++
++@app.post("/notes/search")
++def search_notes_endpoint(body: dict) -> list:
++    from app.vector_store import search
++    return search(body.get("query", ""), k=int(body.get("k", 3)), subject=body.get("subject"))
++
+ @app.get("/")
+ def index() -> FileResponse:
+     return FileResponse(STATIC_DIR / "index.html")

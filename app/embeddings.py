@@ -5,6 +5,14 @@ Grows through the phases:
   Phase 3.2 — embed(), embed_batch() via real OpenRouter/OpenAI embeddings API
 """
 
+# ──────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Embeddings & vectors  [Phase 3]
+# An embedding turns text into a vector so that "close in meaning" becomes
+# "close in space". cosine_similarity measures that closeness with plain maths;
+# embed()/embed_batch() call the model to produce real vectors.
+# Wired into: /embed, /similarity-demo, /semantic-search, and the vector store.
+# ──────────────────────────────────────────────────────────────────────────────
+
 from __future__ import annotations
 
 import math

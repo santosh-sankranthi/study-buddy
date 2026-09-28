@@ -5,6 +5,13 @@ Grows through the phases:
   Phase 5.1 (exercise) — chunk_paragraph()
 """
 
+# ──────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Chunking  [Phase 5.1]
+# Notes must be split into retrievable pieces. chunk_fixed() slides a token
+# window with overlap; chunk_paragraph() keeps whole paragraphs together.
+# Wired into: /notes/upload.
+# ──────────────────────────────────────────────────────────────────────────────
+
 from __future__ import annotations
 
 from common.tokens import count_tokens

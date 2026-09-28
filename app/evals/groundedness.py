@@ -1,5 +1,13 @@
 """Groundedness eval — LLM-as-judge + deterministic checks (Phase 5.5 / 9.2)."""
 
+# ──────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Evaluation  [Phase 5.5 light / Phase 9 general]
+# How do we know an answer is good? Deterministic checks (length, citation) are
+# free and never flake; an LLM-as-judge scores open-ended quality (groundedness,
+# tone) against criteria.
+# Wired into: /eval/groundedness-report and the Phase 9 eval scripts.
+# ──────────────────────────────────────────────────────────────────────────────
+
 from __future__ import annotations
 
 import re

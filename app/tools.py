@@ -5,6 +5,13 @@ Grows through the phases:
   Phase 6.1 — Real Python implementations + TOOL_REGISTRY
 """
 
+# ──────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Function calling & tools  [Phase 1.5 schemas / Phase 6 execution]
+# The JSON schemas tell the model what it may call; TOOL_REGISTRY maps those
+# names to real Python functions that the agent loop actually executes.
+# Wired into: /tools (list schemas), /agent/ask (execute), mcp_server/ (expose via MCP).
+# ──────────────────────────────────────────────────────────────────────────────
+
 from __future__ import annotations
 
 # ── Phase 1.5: Tool schemas (JSON Schema format for OpenAI tool-calling API) ──

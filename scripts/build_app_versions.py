@@ -26,6 +26,17 @@ def _b(text: str) -> str:
     return text.strip("\n")
 
 
+def concept(tag: str, title: str, what: str) -> str:
+    """Return a comment banner that marks which AI concept a block shows.
+
+    These banners are the teaching map: every meaningful block in the generated
+    app is prefixed with the concept it demonstrates, so a student reading
+    ``app/versions/vN/main.py`` can follow the story without a guide.
+    """
+    bar = "# " + "─" * 76
+    return f"{bar}\n# CONCEPT · {title}  [{tag}]\n# {what}\n{bar}"
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Module docstring (shared by every version)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -45,6 +56,16 @@ Phase progression:
   v6  — MCP (/mcp/tools)
   v7  — security middleware (injection, PII, moderation)
   v8  — evaluation endpoints (/eval/groundedness-report, /eval/regression-report)
+
+How to read this file
+  Every meaningful block is prefixed with a comment banner:
+
+      # CONCEPT · <name>  [<phase>]
+      # <one line on what this block does, and what was broken before it>
+
+  The banners are the lesson map. Read them in order and the file's growth is
+  the whole workshop. Helper logic lives in the `app/` modules and is imported,
+  not re-written here -- so this file stays about *wiring concepts together*.
 """'''
 
 
@@ -235,7 +256,7 @@ def ask(request: AskRequest) -> AskResponse:
     if system_content:
         messages.append({"role": "system", "content": system_content})
 
-    # Phase 1.3: CoT injection.
+    # CONCEPT · Chain of thought: ask for step-by-step reasoning.
     user_content = request.question
     if request.cot:
         user_content += (
@@ -268,7 +289,8 @@ _ASK_2 = r'''@app.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest) -> AskResponse:
     """Send a question to Study Buddy. Behaviour grows phase by phase."""
 
-    # ── Phase 2.2: Memory — compact, then load session history ───────────────
+    # ── CONCEPT · Memory [Phase 2.2] ─────────────────────────────────────────
+    # Reload earlier turns so the tutor remembers. Compaction shrinks long history.
     compacted = False
     history: list[dict] = []
     if request.session_id:
@@ -281,7 +303,8 @@ def ask(request: AskRequest) -> AskResponse:
             compacted = compact_if_needed(request.session_id)
         history = get_history(request.session_id)
 
-    # ── Phase 1.1: System prompt ─────────────────────────────────────────────
+    # ── CONCEPT · System prompt [Phase 1.1] ──────────────────────────────────
+    # Prepend a `system` message: who the tutor is and the rules it must follow.
     system_content = build_system(
         mode=request.mode,
         student_name=request.student_name,
@@ -293,7 +316,8 @@ def ask(request: AskRequest) -> AskResponse:
         messages.append({"role": "system", "content": system_content})
     messages += history
 
-    # ── Phase 1.3: CoT injection ─────────────────────────────────────────────
+    # ── CONCEPT · Chain of thought [Phase 1.3] ───────────────────────────────
+    # Ask the model to reason step by step, tagged so we can split it out later.
     user_content = request.question
     if request.cot:
         user_content += (
@@ -303,14 +327,15 @@ def ask(request: AskRequest) -> AskResponse:
         )
     messages.append({"role": "user", "content": user_content})
 
-    # ── Phase 2.1: Context accounting ────────────────────────────────────────
+    # ── CONCEPT · Context window [Phase 2.1] ─────────────────────────────────
+    # Measure the tokens the prompt uses and warn before we hit the model's limit.
     ctx_warning = context_budget_warning(messages)
     ctx_report  = context_report(messages)
 
-    # ── Call the LLM ─────────────────────────────────────────────────────────
+    # ── The model call itself (the one thing v0 already did) ─────────────────
     raw_answer = chat(messages, temperature=request.temperature, top_p=request.top_p)
 
-    # ── Phase 1.3: Parse CoT tags ────────────────────────────────────────────
+    # ── CONCEPT · Chain of thought — separate reasoning from the answer ──────
     thinking: str | None = None
     final_answer = raw_answer
     if request.cot:
@@ -321,7 +346,7 @@ def ask(request: AskRequest) -> AskResponse:
         if a_match:
             final_answer = a_match.group(1).strip()
 
-    # ── Phase 2.2: Save to memory ────────────────────────────────────────────
+    # ── CONCEPT · Memory — store this turn so the next one remembers it ──────
     if request.session_id:
         append(request.session_id, "user", request.question)
         append(request.session_id, "assistant", final_answer)
@@ -341,7 +366,8 @@ _ASK_4 = r'''@app.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest) -> AskResponse:
     """Send a question to Study Buddy. Behaviour grows phase by phase."""
 
-    # ── Phase 2.2: Memory — compact, then load session history ───────────────
+    # ── CONCEPT · Memory [Phase 2.2] ─────────────────────────────────────────
+    # Reload earlier turns so the tutor remembers. Compaction shrinks long history.
     compacted = False
     history: list[dict] = []
     if request.session_id:
@@ -354,14 +380,16 @@ def ask(request: AskRequest) -> AskResponse:
             compacted = compact_if_needed(request.session_id)
         history = get_history(request.session_id)
 
-    # ── Phase 1.1: System prompt ─────────────────────────────────────────────
+    # ── CONCEPT · System prompt [Phase 1.1] ──────────────────────────────────
+    # Prepend a `system` message: who the tutor is and the rules it must follow.
     system_content = build_system(
         mode=request.mode,
         student_name=request.student_name,
         study_goal=request.study_goal,
     )
 
-    # ── Phase 4+: RAG retrieval ──────────────────────────────────────────────
+    # ── CONCEPT · Retrieval [Phase 5] ────────────────────────────────────────
+    # Semantic-search the notes for the most relevant chunks; None = nothing close.
     grounded = False
     sources: list[str] = []
     rag_chunks: list[dict] = []
@@ -377,7 +405,8 @@ def ask(request: AskRequest) -> AskResponse:
         except Exception:  # noqa: BLE001 — RAG not set up yet is fine
             pass
 
-    # ── Build the messages list ──────────────────────────────────────────────
+    # ── CONCEPT · Grounded generation [Phase 5] ──────────────────────────────
+    # If we retrieved notes, build a prompt that answers ONLY from those chunks.
     if grounded and rag_chunks:
         from app.rag import build_rag_prompt
         messages = build_rag_prompt(request.question, rag_chunks)
@@ -390,7 +419,7 @@ def ask(request: AskRequest) -> AskResponse:
             messages.append({"role": "system", "content": system_content})
         messages += history
 
-        # Phase 1.3: CoT injection.
+        # CONCEPT · Chain of thought: ask for step-by-step reasoning.
         user_content = request.question
         if request.cot:
             user_content += (
@@ -400,7 +429,8 @@ def ask(request: AskRequest) -> AskResponse:
             )
         messages.append({"role": "user", "content": user_content})
 
-    # No relevant notes found — refuse rather than hallucinate.
+    # ── CONCEPT · Refusal [Phase 5] ──────────────────────────────────────────
+    # Notes exist but nothing matched: say "I don't know" instead of guessing.
     if request.enable_rag and not grounded:
         try:
             from app.vector_store import count
@@ -415,14 +445,15 @@ def ask(request: AskRequest) -> AskResponse:
         except Exception:  # noqa: BLE001
             pass
 
-    # ── Phase 2.1: Context accounting ────────────────────────────────────────
+    # ── CONCEPT · Context window [Phase 2.1] ─────────────────────────────────
+    # Measure the tokens the prompt uses and warn before we hit the model's limit.
     ctx_warning = context_budget_warning(messages)
     ctx_report  = context_report(messages)
 
-    # ── Call the LLM ─────────────────────────────────────────────────────────
+    # ── The model call itself (the one thing v0 already did) ─────────────────
     raw_answer = chat(messages, temperature=request.temperature, top_p=request.top_p)
 
-    # ── Phase 1.3: Parse CoT tags ────────────────────────────────────────────
+    # ── CONCEPT · Chain of thought — separate reasoning from the answer ──────
     thinking: str | None = None
     final_answer = raw_answer
     if request.cot:
@@ -433,7 +464,7 @@ def ask(request: AskRequest) -> AskResponse:
         if a_match:
             final_answer = a_match.group(1).strip()
 
-    # ── Phase 2.2: Save to memory ────────────────────────────────────────────
+    # ── CONCEPT · Memory — store this turn so the next one remembers it ──────
     if request.session_id:
         append(request.session_id, "user", request.question)
         append(request.session_id, "assistant", final_answer)
@@ -455,7 +486,8 @@ _ASK_7 = r'''@app.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest) -> AskResponse:
     """Send a question to Study Buddy. Behaviour grows phase by phase."""
 
-    # ── Phase 7: Security — sanitize input ──────────────────────────────────
+    # ── CONCEPT · Prompt injection + PII [Phase 8] ───────────────────────────
+    # Strip injected instructions and redact personal data before anything runs.
     question           = request.question
     injection_detected = False
     pii_detected       = False
@@ -473,7 +505,8 @@ def ask(request: AskRequest) -> AskResponse:
                 detail=f"Request blocked by content policy. Categories: {input_mod.get('categories', {})}",
             )
 
-    # ── Phase 2.2: Memory — compact, then load session history ───────────────
+    # ── CONCEPT · Memory [Phase 2.2] ─────────────────────────────────────────
+    # Reload earlier turns so the tutor remembers. Compaction shrinks long history.
     compacted = False
     history: list[dict] = []
     if request.session_id:
@@ -486,14 +519,16 @@ def ask(request: AskRequest) -> AskResponse:
             compacted = compact_if_needed(request.session_id)
         history = get_history(request.session_id)
 
-    # ── Phase 1.1: System prompt ─────────────────────────────────────────────
+    # ── CONCEPT · System prompt [Phase 1.1] ──────────────────────────────────
+    # Prepend a `system` message: who the tutor is and the rules it must follow.
     system_content = build_system(
         mode=request.mode,
         student_name=request.student_name,
         study_goal=request.study_goal,
     )
 
-    # ── Phase 4+: RAG retrieval ──────────────────────────────────────────────
+    # ── CONCEPT · Retrieval [Phase 5] ────────────────────────────────────────
+    # Semantic-search the notes for the most relevant chunks; None = nothing close.
     grounded = False
     sources: list[str] = []
     rag_chunks: list[dict] = []
@@ -509,7 +544,8 @@ def ask(request: AskRequest) -> AskResponse:
         except Exception:  # noqa: BLE001 — RAG not set up yet is fine
             pass
 
-    # ── Build the messages list ──────────────────────────────────────────────
+    # ── CONCEPT · Grounded generation [Phase 5] ──────────────────────────────
+    # If we retrieved notes, build a prompt that answers ONLY from those chunks.
     if grounded and rag_chunks:
         from app.rag import build_rag_prompt
         messages = build_rag_prompt(question, rag_chunks)
@@ -522,7 +558,7 @@ def ask(request: AskRequest) -> AskResponse:
             messages.append({"role": "system", "content": system_content})
         messages += history
 
-        # Phase 1.3: CoT injection.
+        # CONCEPT · Chain of thought: ask for step-by-step reasoning.
         user_content = question
         if request.cot:
             user_content += (
@@ -532,7 +568,8 @@ def ask(request: AskRequest) -> AskResponse:
             )
         messages.append({"role": "user", "content": user_content})
 
-    # No relevant notes found — refuse rather than hallucinate.
+    # ── CONCEPT · Refusal [Phase 5] ──────────────────────────────────────────
+    # Notes exist but nothing matched: say "I don't know" instead of guessing.
     if request.enable_rag and not grounded:
         try:
             from app.vector_store import count
@@ -550,20 +587,21 @@ def ask(request: AskRequest) -> AskResponse:
         except Exception:  # noqa: BLE001
             pass
 
-    # ── Phase 2.1: Context accounting ────────────────────────────────────────
+    # ── CONCEPT · Context window [Phase 2.1] ─────────────────────────────────
+    # Measure the tokens the prompt uses and warn before we hit the model's limit.
     ctx_warning = context_budget_warning(messages)
     ctx_report  = context_report(messages)
 
-    # ── Call the LLM ─────────────────────────────────────────────────────────
+    # ── The model call itself (the one thing v0 already did) ─────────────────
     raw_answer = chat(messages, temperature=request.temperature, top_p=request.top_p)
 
-    # ── Phase 7: Moderate output ─────────────────────────────────────────────
+    # ── CONCEPT · Moderation [Phase 8] — check the model's output too ────────
     if request.enable_security:
         out_mod = moderate(raw_answer)
         if out_mod.get("flagged"):
             raw_answer = "[Response blocked by content policy.]"
 
-    # ── Phase 1.3: Parse CoT tags ────────────────────────────────────────────
+    # ── CONCEPT · Chain of thought — separate reasoning from the answer ──────
     thinking: str | None = None
     final_answer = raw_answer
     if request.cot:
@@ -574,7 +612,7 @@ def ask(request: AskRequest) -> AskResponse:
         if a_match:
             final_answer = a_match.group(1).strip()
 
-    # ── Phase 2.2: Save to memory ────────────────────────────────────────────
+    # ── CONCEPT · Memory — store this turn so the next one remembers it ──────
     if request.session_id:
         append(request.session_id, "user", question)
         append(request.session_id, "assistant", final_answer)
@@ -597,15 +635,22 @@ def ask(request: AskRequest) -> AskResponse:
 
 
 def ask_for(level: int) -> str:
+    banner = concept(
+        "Phase 0-9",
+        "/ask — the core endpoint",
+        "One question in, one answer out. Each phase adds one step inside this function.",
+    )
     if level == 0:
-        return _ASK_0
-    if level == 1:
-        return _ASK_1
-    if level <= 3:
-        return _ASK_2
-    if level <= 6:
-        return _ASK_4
-    return _ASK_7
+        body = _ASK_0
+    elif level == 1:
+        body = _ASK_1
+    elif level <= 3:
+        body = _ASK_2
+    elif level <= 6:
+        body = _ASK_4
+    else:
+        body = _ASK_7
+    return banner + "\n\n" + body
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -880,22 +925,74 @@ def regression_report() -> dict:
 def endpoints_for(level: int) -> list[str]:
     blocks: list[str] = []
     if level >= 1:
-        blocks += [EP_MODES, EP_QUIZ, EP_FLASHCARDS, EP_STUDY_PLAN, EP_TOOLS]
+        blocks += [
+            concept("Phase 1.1", "Personas / modes",
+                    "List the tutor personas the frontend can choose from."),
+            EP_MODES,
+            concept("Phase 1.2", "Few-shot",
+                    "Two worked Q&A -> MCQ examples fix the JSON shape of /quiz-item."),
+            EP_QUIZ,
+            concept("Phase 1.4", "Structured output",
+                    "Pydantic validates the model's JSON, or raises ValidationError."),
+            EP_FLASHCARDS,
+            concept("Phase 1.4", "Structured output (a list)",
+                    "A multi-day plan validated against StudyPlanDay and a time budget."),
+            EP_STUDY_PLAN,
+            concept("Phase 1.5", "Function calling (schemas)",
+                    "Publish the JSON tool contracts; nothing is executed yet."),
+            EP_TOOLS,
+        ]
     if level >= 2:
         blocks += [
-            EP_CONTEXT_REPORT, EP_SESSION_HISTORY, EP_MEASURE_LONG_CONTEXT,
+            concept("Phase 2.1", "Context sources",
+                    "Show where the prompt's tokens go, broken down by role."),
+            EP_CONTEXT_REPORT,
+            concept("Phase 2.2", "Memory (API)",
+                    "Read or clear a session's stored conversation."),
+            EP_SESSION_HISTORY,
+            concept("Phase 2.4", "Long context",
+                    "Measure latency and cost as the pasted document grows."),
+            EP_MEASURE_LONG_CONTEXT,
         ]
     if level >= 3:
         blocks += [
-            EP_EMBED, EP_SIMILARITY_DEMO, EP_SEMANTIC_SEARCH,
-            EP_NOTES_UPLOAD, EP_NOTES_SEARCH,
+            concept("Phase 3.2", "Embeddings",
+                    "Turn text into a vector; return its size and a preview."),
+            EP_EMBED,
+            concept("Phase 3.1", "Vector representations",
+                    "Rank toy vectors by cosine similarity -- the idea, by hand."),
+            EP_SIMILARITY_DEMO,
+            concept("Phase 3.3", "Semantic search",
+                    "Rank documents by meaning, not by exact words."),
+            EP_SEMANTIC_SEARCH,
+            concept("Phase 4.1", "Indexing",
+                    "Chunk notes and store their vectors in ChromaDB."),
+            EP_NOTES_UPLOAD,
+            concept("Phase 4.2", "Similarity search",
+                    "Query the vector store, optionally filtered by subject."),
+            EP_NOTES_SEARCH,
         ]
     if level >= 5:
-        blocks += [EP_AGENT_ASK]
+        blocks += [
+            concept("Phase 6", "Agents",
+                    "A ReAct loop that calls tools, plus a planner->executor->critic pipeline."),
+            EP_AGENT_ASK,
+        ]
     if level >= 6:
-        blocks += [EP_MCP_TOOLS]
+        blocks += [
+            concept("Phase 7", "MCP",
+                    "List tools discovered from the MCP server over stdio."),
+            EP_MCP_TOOLS,
+        ]
     if level >= 8:
-        blocks += [EP_EVAL_GROUNDEDNESS, EP_EVAL_REGRESSION]
+        blocks += [
+            concept("Phase 9.5", "Observability",
+                    "Pass rate over logged groundedness checks."),
+            EP_EVAL_GROUNDEDNESS,
+            concept("Phase 9.4", "Regression testing",
+                    "Run a built-in eval set against the running app."),
+            EP_EVAL_REGRESSION,
+        ]
     return blocks
 
 
@@ -903,7 +1000,11 @@ def endpoints_for(level: int) -> list[str]:
 # Assembly
 # ─────────────────────────────────────────────────────────────────────────────
 
-EP_INDEX = r'''@app.get("/")
+EP_INDEX = concept(
+    "all phases",
+    "Frontend",
+    "Serve the single-page UI; every phase of the workshop is driven through it.",
+) + "\n\n" + r'''@app.get("/")
 def index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
 
@@ -912,12 +1013,20 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")'''
 
 
 def compose(level: int) -> str:
+    models_block = models_for(level)
+    if level >= 1:
+        models_block = concept(
+            "Phase 1.4",
+            "API request / response contract",
+            "Pydantic types the request we accept and the response we return.",
+        ) + "\n\n" + models_block
+
     parts = [
         MODULE_DOC,
         imports_for(level),
         'STATIC_DIR = _APP_DIR / "static"',
         f'app = FastAPI(title="Study Buddy", version="v{level}")',
-        models_for(level),
+        models_block,
         ask_for(level),
         *endpoints_for(level),
         EP_INDEX,

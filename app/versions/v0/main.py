@@ -13,6 +13,16 @@ Phase progression:
   v6  — MCP (/mcp/tools)
   v7  — security middleware (injection, PII, moderation)
   v8  — evaluation endpoints (/eval/groundedness-report, /eval/regression-report)
+
+How to read this file
+  Every meaningful block is prefixed with a comment banner:
+
+      # CONCEPT · <name>  [<phase>]
+      # <one line on what this block does, and what was broken before it>
+
+  The banners are the lesson map. Read them in order and the file's growth is
+  the whole workshop. Helper logic lives in the `app/` modules and is imported,
+  not re-written here -- so this file stays about *wiring concepts together*.
 """
 
 from __future__ import annotations
@@ -46,6 +56,11 @@ class AskRequest(BaseModel):
 class AskResponse(BaseModel):
     answer: str
 
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · /ask — the core endpoint  [Phase 0-9]
+# One question in, one answer out. Each phase adds one step inside this function.
+# ────────────────────────────────────────────────────────────────────────────
+
 @app.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest) -> AskResponse:
     """Raw one-shot forward pass: no persona, no memory, no grounding."""
@@ -54,6 +69,11 @@ def ask(request: AskRequest) -> AskResponse:
         temperature=0.7,
     )
     return AskResponse(answer=raw)
+
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Frontend  [all phases]
+# Serve the single-page UI; every phase of the workshop is driven through it.
+# ────────────────────────────────────────────────────────────────────────────
 
 @app.get("/")
 def index() -> FileResponse:

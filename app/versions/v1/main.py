@@ -13,6 +13,16 @@ Phase progression:
   v6  — MCP (/mcp/tools)
   v7  — security middleware (injection, PII, moderation)
   v8  — evaluation endpoints (/eval/groundedness-report, /eval/regression-report)
+
+How to read this file
+  Every meaningful block is prefixed with a comment banner:
+
+      # CONCEPT · <name>  [<phase>]
+      # <one line on what this block does, and what was broken before it>
+
+  The banners are the lesson map. Read them in order and the file's growth is
+  the whole workshop. Helper logic lives in the `app/` modules and is imported,
+  not re-written here -- so this file stays about *wiring concepts together*.
 """
 
 from __future__ import annotations
@@ -43,6 +53,11 @@ STATIC_DIR = _APP_DIR / "static"
 
 app = FastAPI(title="Study Buddy", version="v1")
 
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · API request / response contract  [Phase 1.4]
+# Pydantic types the request we accept and the response we return.
+# ────────────────────────────────────────────────────────────────────────────
+
 class AskRequest(BaseModel):
     question:    str
     mode:        str   = "tutor"
@@ -57,6 +72,11 @@ class AskResponse(BaseModel):
     input_tokens:  int = 0
     output_tokens: int = 0
 
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · /ask — the core endpoint  [Phase 0-9]
+# One question in, one answer out. Each phase adds one step inside this function.
+# ────────────────────────────────────────────────────────────────────────────
+
 @app.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest) -> AskResponse:
     """Send a question to Study Buddy. Behaviour grows phase by phase."""
@@ -66,7 +86,7 @@ def ask(request: AskRequest) -> AskResponse:
     if system_content:
         messages.append({"role": "system", "content": system_content})
 
-    # Phase 1.3: CoT injection.
+    # CONCEPT · Chain of thought: ask for step-by-step reasoning.
     user_content = request.question
     if request.cot:
         user_content += (
@@ -95,9 +115,19 @@ def ask(request: AskRequest) -> AskResponse:
         output_tokens=count_tokens(final_answer),
     )
 
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Personas / modes  [Phase 1.1]
+# List the tutor personas the frontend can choose from.
+# ────────────────────────────────────────────────────────────────────────────
+
 @app.get("/modes")
 def list_modes() -> list[str]:
     return ["tutor", "direct", "flashcard"]
+
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Few-shot  [Phase 1.2]
+# Two worked Q&A -> MCQ examples fix the JSON shape of /quiz-item.
+# ────────────────────────────────────────────────────────────────────────────
 
 QUIZ_EXAMPLES = [
     {
@@ -136,6 +166,11 @@ def make_quiz_item(body: dict) -> dict:
 
     return item.model_dump()
 
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Structured output  [Phase 1.4]
+# Pydantic validates the model's JSON, or raises ValidationError.
+# ────────────────────────────────────────────────────────────────────────────
+
 @app.post("/flashcards")
 def make_flashcards(body: dict) -> dict:
     topic = body.get("topic", "")
@@ -152,6 +187,11 @@ def make_flashcards(body: dict) -> dict:
     raw  = chat(messages, temperature=0.3)
     card = Flashcard.model_validate_json(raw)
     return card.model_dump()
+
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Structured output (a list)  [Phase 1.4]
+# A multi-day plan validated against StudyPlanDay and a time budget.
+# ────────────────────────────────────────────────────────────────────────────
 
 @app.post("/study-plan")
 def make_study_plan(body: dict) -> list:
@@ -183,9 +223,19 @@ def make_study_plan(body: dict) -> list:
         )
     return [d.model_dump() for d in plan]
 
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Function calling (schemas)  [Phase 1.5]
+# Publish the JSON tool contracts; nothing is executed yet.
+# ────────────────────────────────────────────────────────────────────────────
+
 @app.get("/tools")
 def list_tools() -> list:
     return TOOLS
+
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Frontend  [all phases]
+# Serve the single-page UI; every phase of the workshop is driven through it.
+# ────────────────────────────────────────────────────────────────────────────
 
 @app.get("/")
 def index() -> FileResponse:
