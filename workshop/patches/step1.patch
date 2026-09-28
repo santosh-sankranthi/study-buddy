@@ -1,5 +1,5 @@
 diff --git a/app/main.py b/app/main.py
-index 6b59ec5..72ca7ac 100644
+index 96c6f53..8d911e1 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -28,6 +28,7 @@ How to read this file
@@ -10,7 +10,7 @@ index 6b59ec5..72ca7ac 100644
  from pathlib import Path
  
  # Locate the app package by walking up from this file, so this module works
-@@ -37,24 +38,39 @@ while _APP_DIR.name != "app" and _APP_DIR.parent != _APP_DIR:
+@@ -37,17 +38,20 @@ while _APP_DIR.name != "app" and _APP_DIR.parent != _APP_DIR:
      _APP_DIR = _APP_DIR.parent
  sys.path.insert(0, str(_APP_DIR.parent))
  
@@ -31,6 +31,15 @@ index 6b59ec5..72ca7ac 100644
  
 -app = FastAPI(title="Study Buddy", version="v0")
 +app = FastAPI(title="Study Buddy", version="v1")
+ 
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · /meta — capability manifest  [all phases]
+@@ -56,14 +60,26 @@ app = FastAPI(title="Study Buddy", version="v0")
+ @app.get("/meta")
+ def meta() -> dict:
+     """What this version supports; the frontend gates its controls on this."""
+-    return {"version": "v0", "features": []}
++    return {"version": "v1", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema']}
 +
 +# ────────────────────────────────────────────────────────────────────────────
 +# CONCEPT · API request / response contract  [Phase 1.4]
@@ -55,7 +64,7 @@ index 6b59ec5..72ca7ac 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · /ask — the core endpoint  [Phase 0-9]
-@@ -63,12 +79,158 @@ class AskResponse(BaseModel):
+@@ -72,12 +88,158 @@ class AskResponse(BaseModel):
  
  @app.post("/ask", response_model=AskResponse)
  def ask(request: AskRequest) -> AskResponse:

@@ -1,5 +1,5 @@
 diff --git a/app/main.py b/app/main.py
-index e914895..d6379cb 100644
+index be22f51..c24fe8b 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -54,7 +54,7 @@ from app.context import context_budget_warning, context_report
@@ -10,8 +10,17 @@ index e914895..d6379cb 100644
 +app = FastAPI(title="Study Buddy", version="v3")
  
  # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · /meta — capability manifest  [all phases]
+@@ -63,7 +63,7 @@ app = FastAPI(title="Study Buddy", version="v2")
+ @app.get("/meta")
+ def meta() -> dict:
+     """What this version supports; the frontend gates its controls on this."""
+-    return {"version": "v2", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context']}
++    return {"version": "v3", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'embeddings', 'notes']}
+ 
+ # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -345,6 +345,80 @@ def measure_long_context(body: dict) -> list:
+@@ -354,6 +354,80 @@ def measure_long_context(body: dict) -> list:
          })
      return results
  

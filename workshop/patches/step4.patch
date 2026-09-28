@@ -1,5 +1,5 @@
 diff --git a/app/main.py b/app/main.py
-index d6379cb..3e7db4e 100644
+index c24fe8b..5d42576 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -54,7 +54,7 @@ from app.context import context_budget_warning, context_report
@@ -10,8 +10,17 @@ index d6379cb..3e7db4e 100644
 +app = FastAPI(title="Study Buddy", version="v4")
  
  # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · /meta — capability manifest  [all phases]
+@@ -63,7 +63,7 @@ app = FastAPI(title="Study Buddy", version="v3")
+ @app.get("/meta")
+ def meta() -> dict:
+     """What this version supports; the frontend gates its controls on this."""
+-    return {"version": "v3", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'embeddings', 'notes']}
++    return {"version": "v4", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'embeddings', 'notes', 'rag']}
+ 
+ # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -71,11 +71,14 @@ class AskRequest(BaseModel):
+@@ -80,11 +80,14 @@ class AskRequest(BaseModel):
      student_name:     str | None = None
      study_goal:       str | None = None
      compact_strategy: str        = "halve"   # "halve" | "keep_last2"
@@ -26,7 +35,7 @@ index d6379cb..3e7db4e 100644
      input_tokens:    int = 0
      output_tokens:   int = 0
      context_report:  dict = {}
-@@ -113,21 +116,62 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -122,21 +125,62 @@ def ask(request: AskRequest) -> AskResponse:
          study_goal=request.study_goal,
      )
  
@@ -104,7 +113,7 @@ index d6379cb..3e7db4e 100644
  
      # ── CONCEPT · Context window [Phase 2.1] ─────────────────────────────────
      # Measure the tokens the prompt uses and warn before we hit the model's limit.
-@@ -157,6 +201,8 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -166,6 +210,8 @@ def ask(request: AskRequest) -> AskResponse:
      return AskResponse(
          answer=final_answer,
          thinking=thinking,

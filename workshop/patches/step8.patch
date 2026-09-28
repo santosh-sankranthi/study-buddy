@@ -1,5 +1,5 @@
 diff --git a/app/main.py b/app/main.py
-index 824af8a..db824de 100644
+index 4841c68..aa9a836 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -31,6 +31,7 @@ import sys
@@ -18,8 +18,17 @@ index 824af8a..db824de 100644
 +app = FastAPI(title="Study Buddy", version="v8")
  
  # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · /meta — capability manifest  [all phases]
+@@ -64,7 +65,7 @@ app = FastAPI(title="Study Buddy", version="v7")
+ @app.get("/meta")
+ def meta() -> dict:
+     """What this version supports; the frontend gates its controls on this."""
+-    return {"version": "v7", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'embeddings', 'notes', 'rag', 'agents', 'mcp', 'security']}
++    return {"version": "v8", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'embeddings', 'notes', 'rag', 'agents', 'mcp', 'security', 'evals']}
+ 
+ # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -531,6 +532,70 @@ def mcp_tools() -> list:
+@@ -540,6 +541,70 @@ def mcp_tools() -> list:
      except Exception as exc:  # noqa: BLE001
          raise HTTPException(status_code=503, detail=f"MCP server unavailable: {exc}")
  

@@ -1,5 +1,5 @@
 diff --git a/app/main.py b/app/main.py
-index 3e7db4e..3e32c51 100644
+index 5d42576..f17ad63 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -54,7 +54,7 @@ from app.context import context_budget_warning, context_report
@@ -10,8 +10,17 @@ index 3e7db4e..3e32c51 100644
 +app = FastAPI(title="Study Buddy", version="v5")
  
  # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · /meta — capability manifest  [all phases]
+@@ -63,7 +63,7 @@ app = FastAPI(title="Study Buddy", version="v4")
+ @app.get("/meta")
+ def meta() -> dict:
+     """What this version supports; the frontend gates its controls on this."""
+-    return {"version": "v4", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'embeddings', 'notes', 'rag']}
++    return {"version": "v5", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'embeddings', 'notes', 'rag', 'agents']}
+ 
+ # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -465,6 +465,22 @@ def search_notes_endpoint(body: dict) -> list:
+@@ -474,6 +474,22 @@ def search_notes_endpoint(body: dict) -> list:
      from app.vector_store import search
      return search(body.get("query", ""), k=int(body.get("k", 3)), subject=body.get("subject"))
  

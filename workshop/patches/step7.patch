@@ -1,5 +1,5 @@
 diff --git a/app/main.py b/app/main.py
-index f06fae6..824af8a 100644
+index 6cef11e..4841c68 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -51,10 +51,11 @@ from app.prompts import build_few_shot_prompt, build_system
@@ -14,8 +14,17 @@ index f06fae6..824af8a 100644
 +app = FastAPI(title="Study Buddy", version="v7")
  
  # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · /meta — capability manifest  [all phases]
+@@ -63,7 +64,7 @@ app = FastAPI(title="Study Buddy", version="v6")
+ @app.get("/meta")
+ def meta() -> dict:
+     """What this version supports; the frontend gates its controls on this."""
+-    return {"version": "v6", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'embeddings', 'notes', 'rag', 'agents', 'mcp']}
++    return {"version": "v7", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'embeddings', 'notes', 'rag', 'agents', 'mcp', 'security']}
+ 
+ # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -72,18 +73,22 @@ class AskRequest(BaseModel):
+@@ -81,18 +82,22 @@ class AskRequest(BaseModel):
      study_goal:       str | None = None
      compact_strategy: str        = "halve"   # "halve" | "keep_last2"
      enable_rag:       bool       = True      # Phase 4+
@@ -47,7 +56,7 @@ index f06fae6..824af8a 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · /ask — the core endpoint  [Phase 0-9]
-@@ -94,6 +99,25 @@ class AskResponse(BaseModel):
+@@ -103,6 +108,25 @@ class AskResponse(BaseModel):
  def ask(request: AskRequest) -> AskResponse:
      """Send a question to Study Buddy. Behaviour grows phase by phase."""
  
@@ -73,7 +82,7 @@ index f06fae6..824af8a 100644
      # ── CONCEPT · Memory [Phase 2.2] ─────────────────────────────────────────
      # Reload earlier turns so the tutor remembers. Compaction shrinks long history.
      compacted = False
-@@ -125,7 +149,7 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -134,7 +158,7 @@ def ask(request: AskRequest) -> AskResponse:
          try:
              from app.vector_store import retrieve
              from app.rag import extract_sources
@@ -82,7 +91,7 @@ index f06fae6..824af8a 100644
              if chunks:
                  rag_chunks = chunks
                  sources    = extract_sources(chunks)
-@@ -137,7 +161,7 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -146,7 +170,7 @@ def ask(request: AskRequest) -> AskResponse:
      # If we retrieved notes, build a prompt that answers ONLY from those chunks.
      if grounded and rag_chunks:
          from app.rag import build_rag_prompt
@@ -91,7 +100,7 @@ index f06fae6..824af8a 100644
          # Prepend history before the RAG user message.
          if history:
              messages = [messages[0]] + history + [messages[1]]
-@@ -148,7 +172,7 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -157,7 +181,7 @@ def ask(request: AskRequest) -> AskResponse:
          messages += history
  
          # CONCEPT · Chain of thought: ask for step-by-step reasoning.
@@ -100,7 +109,7 @@ index f06fae6..824af8a 100644
          if request.cot:
              user_content += (
                  "\n\nThink step by step before answering. "
-@@ -166,8 +190,11 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -175,8 +199,11 @@ def ask(request: AskRequest) -> AskResponse:
                  return AskResponse(
                      answer="I don't have enough information in your notes to answer this.",
                      grounded=False,
@@ -113,7 +122,7 @@ index f06fae6..824af8a 100644
                      compacted=compacted,
                  )
          except Exception:  # noqa: BLE001
-@@ -181,6 +208,12 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -190,6 +217,12 @@ def ask(request: AskRequest) -> AskResponse:
      # ── The model call itself (the one thing v0 already did) ─────────────────
      raw_answer = chat(messages, temperature=request.temperature, top_p=request.top_p)
  
@@ -126,7 +135,7 @@ index f06fae6..824af8a 100644
      # ── CONCEPT · Chain of thought — separate reasoning from the answer ──────
      thinking: str | None = None
      final_answer = raw_answer
-@@ -194,7 +227,7 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -203,7 +236,7 @@ def ask(request: AskRequest) -> AskResponse:
  
      # ── CONCEPT · Memory — store this turn so the next one remembers it ──────
      if request.session_id:
@@ -135,7 +144,7 @@ index f06fae6..824af8a 100644
          append(request.session_id, "assistant", final_answer)
  
      input_tokens = count_tokens(" ".join(m.get("content") or "" for m in messages))
-@@ -207,6 +240,9 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -216,6 +249,9 @@ def ask(request: AskRequest) -> AskResponse:
          output_tokens=count_tokens(final_answer),
          context_report=ctx_report,
          context_warning=ctx_warning,
