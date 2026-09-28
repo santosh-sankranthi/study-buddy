@@ -1,10 +1,8 @@
 <!DOCTYPE html>
 <!--
-  Study Buddy frontend -- deliberately boring.
-
-  One static file, vanilla JS, a fetch() to the FastAPI backend. There is no
-  build step and no framework on purpose: the AI concept should be the only
-  thing competing for attention in the room.
+  Study Buddy frontend — deliberately simple.
+  Grows alongside app/main.py through every phase.
+  No framework, no build step. Vanilla JS + fetch().
 -->
 <html lang="en">
 <head>
@@ -12,76 +10,352 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Study Buddy</title>
   <style>
-    :root { color-scheme: light dark; }
+    :root {
+      color-scheme: light dark;
+      --accent: #4f86f7;
+      --warn:   #e07b00;
+      --ok:     #2a9d5c;
+      --radius: 10px;
+    }
     body {
       font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      max-width: 720px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5;
+      max-width: 780px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55;
     }
-    h1 { margin-bottom: 0.25rem; }
-    .version { color: #888; font-size: 0.85rem; margin-top: 0; }
+    h1 { margin-bottom: 0.15rem; }
+    .version { color: #888; font-size: 0.82rem; margin: 0 0 1.2rem; }
+
+    /* ── Controls ── */
+    .controls { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.6rem; align-items: center; }
+    label { font-size: 0.85rem; color: #555; }
+    select, input[type=text] {
+      font: inherit; padding: 0.3rem 0.5rem; border: 1px solid #bbb;
+      border-radius: 6px; background: inherit; color: inherit;
+    }
+    .slider-row { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; }
+    input[type=range] { width: 100px; }
+    input[type=checkbox] { width: 1rem; height: 1rem; }
+
+    /* ── Question box ── */
     textarea {
-      width: 100%; box-sizing: border-box; min-height: 90px; padding: 0.6rem;
-      font: inherit; border: 1px solid #bbb; border-radius: 8px; resize: vertical;
+      width: 100%; box-sizing: border-box; min-height: 90px;
+      padding: 0.6rem; font: inherit; border: 1px solid #bbb;
+      border-radius: var(--radius); resize: vertical;
     }
+    .row { display: flex; gap: 0.5rem; margin-top: 0.5rem; align-items: center; }
     button {
-      margin-top: 0.5rem; padding: 0.55rem 1.1rem; font: inherit; cursor: pointer;
-      border: 1px solid #666; border-radius: 8px; background: #eee;
+      padding: 0.5rem 1.1rem; font: inherit; cursor: pointer;
+      border: 1px solid #666; border-radius: 8px; background: #eee; color: inherit;
     }
-    button:disabled { opacity: 0.5; cursor: default; }
-    #answer {
-      white-space: pre-wrap; border: 1px solid #bbb; border-radius: 8px;
-      padding: 0.8rem; margin-top: 1rem; min-height: 2rem; background: rgba(127,127,127,0.06);
+    button:disabled { opacity: 0.45; cursor: default; }
+    .hint { color: #888; font-size: 0.83rem; }
+
+    /* ── Answer area ── */
+    #answer-box { margin-top: 1rem; }
+    .answer-bubble {
+      white-space: pre-wrap; border: 1px solid #bbb; border-radius: var(--radius);
+      padding: 0.8rem; min-height: 2rem; background: rgba(127,127,127,0.05);
     }
-    .hint { color: #888; font-size: 0.85rem; }
+    .thinking-bubble {
+      font-size: 0.82rem; color: #666; border-left: 3px solid var(--accent);
+      padding: 0.5rem 0.8rem; margin-bottom: 0.5rem; background: rgba(79,134,247,0.05);
+      border-radius: 0 var(--radius) var(--radius) 0; white-space: pre-wrap;
+    }
+
+    /* ── Metadata chips ── */
+    .meta { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; font-size: 0.78rem; }
+    .chip {
+      padding: 0.15rem 0.55rem; border-radius: 99px; background: #eee;
+      border: 1px solid #ccc; color: #444;
+    }
+    .chip.warn { background: #fff3e0; border-color: var(--warn); color: var(--warn); }
+    .chip.ok   { background: #e8f5e9; border-color: var(--ok);   color: var(--ok);  }
+    .chip.bad  { background: #fdecea; border-color: #c0392b;     color: #c0392b;    }
+
+    /* ── Sources ── */
+    .sources { margin-top: 0.4rem; font-size: 0.8rem; color: #555; }
+
+    /* ── Warning banner ── */
+    #ctx-warning {
+      background: #fff3cd; border: 1px solid var(--warn); border-radius: 6px;
+      padding: 0.4rem 0.7rem; font-size: 0.85rem; color: var(--warn); margin-top: 0.4rem;
+    }
+
+    /* ── Trace panel ── */
+    #trace-panel { margin-top: 1rem; border: 1px solid #ddd; border-radius: var(--radius); overflow: hidden; }
+    #trace-panel summary { padding: 0.5rem 0.8rem; cursor: pointer; font-weight: 600; font-size: 0.88rem; }
+    .trace-step {
+      border-top: 1px solid #eee; padding: 0.5rem 0.8rem; font-size: 0.8rem;
+      font-family: ui-monospace, monospace; white-space: pre-wrap;
+    }
+    .trace-step .label { font-weight: bold; color: var(--accent); }
+
+    /* ── Debug / context report ── */
+    #debug-panel { margin-top: 0.8rem; font-size: 0.78rem; color: #666; }
+    table { border-collapse: collapse; width: 100%; }
+    td, th { border: 1px solid #ddd; padding: 0.25rem 0.6rem; text-align: left; }
+    th { background: #f4f4f4; }
   </style>
 </head>
 <body>
-  <h1>Study Buddy</h1>
-  <p class="version">v0 &mdash; raw one-shot Q&amp;A</p>
+  <h1>📚 Study Buddy</h1>
+  <p class="version" id="ver">v1–v8 — phases unlock as you build</p>
 
-  <textarea id="question" placeholder="Ask me anything..."></textarea>
-  <br />
-  <button id="send">Ask</button>
-  <span class="hint" id="status"></span>
+  <!-- ── Controls ── -->
+  <div class="controls">
+    <label>Mode:
+      <select id="mode">
+        <option value="tutor">Tutor (Socratic)</option>
+        <option value="direct">Direct</option>
+        <option value="flashcard">Flashcard JSON</option>
+      </select>
+    </label>
 
-  <div id="answer" hidden></div>
+    <label>Session:
+      <input type="text" id="session-id" placeholder="(stateless)" style="width:110px;" />
+    </label>
+
+    <label>Name:
+      <input type="text" id="student-name" placeholder="optional" style="width:90px;" />
+    </label>
+
+    <label style="display:flex;align-items:center;gap:0.3rem;">
+      <input type="checkbox" id="cot" /> CoT
+    </label>
+    <label style="display:flex;align-items:center;gap:0.3rem;">
+      <input type="checkbox" id="enable-rag" checked /> RAG
+    </label>
+    <label style="display:flex;align-items:center;gap:0.3rem;">
+      <input type="checkbox" id="enable-security" checked /> Security
+    </label>
+  </div>
+
+  <div class="controls">
+    <span class="slider-row">
+      🌡 Temp <input type="range" id="temperature" min="0" max="2" step="0.05" value="0.7" />
+      <span id="temp-val">0.7</span>
+    </span>
+    <span class="slider-row">
+      Top-p <input type="range" id="top-p" min="0.01" max="1" step="0.05" value="1.0" />
+      <span id="topp-val">1.0</span>
+    </span>
+  </div>
+
+  <!-- ── Question input ── -->
+  <textarea id="question" placeholder="Ask me anything... (Ctrl+Enter to send)"></textarea>
+  <div class="row">
+    <button id="send">Ask</button>
+    <span class="hint" id="status"></span>
+  </div>
+
+  <!-- ── Context warning ── -->
+  <div id="ctx-warning" hidden></div>
+
+  <!-- ── Answer ── -->
+  <div id="answer-box" hidden>
+    <div id="thinking-panel" hidden>
+      <div class="thinking-bubble" id="thinking"></div>
+    </div>
+    <div class="answer-bubble" id="answer"></div>
+    <div class="sources" id="sources"></div>
+    <div class="meta" id="meta"></div>
+  </div>
+
+  <!-- ── Trace panel (Phase 6) ── -->
+  <details id="trace-panel" hidden>
+    <summary>🔍 Agent Trace</summary>
+    <div id="trace-steps"></div>
+  </details>
+
+  <!-- ── Debug: context report ── -->
+  <details id="debug-panel" hidden>
+    <summary style="padding:0.4rem 0;cursor:pointer;font-size:0.85rem;">🛠 Context Report</summary>
+    <table id="ctx-table">
+      <thead><tr><th>Role</th><th>Tokens</th></tr></thead>
+      <tbody id="ctx-body"></tbody>
+    </table>
+  </details>
 
   <script>
-    const questionEl = document.getElementById("question");
-    const buttonEl = document.getElementById("send");
-    const answerEl = document.getElementById("answer");
-    const statusEl = document.getElementById("status");
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    const $  = (id) => document.getElementById(id);
+    const el = {
+      question:  $("question"),
+      send:      $("send"),
+      status:    $("status"),
+      answer:    $("answer"),
+      thinking:  $("thinking"),
+      answerBox: $("answer-box"),
+      thinkPanel:$("thinking-panel"),
+      ctxWarn:   $("ctx-warning"),
+      sources:   $("sources"),
+      meta:      $("meta"),
+      tracePanel:$("trace-panel"),
+      traceSteps:$("trace-steps"),
+      debugPanel:$("debug-panel"),
+      ctxBody:   $("ctx-body"),
+      mode:      $("mode"),
+      sessionId: $("session-id"),
+      studentName:$("student-name"),
+      cot:       $("cot"),
+      rag:       $("enable-rag"),
+      security:  $("enable-security"),
+      temp:      $("temperature"),
+      tempVal:   $("temp-val"),
+      topP:      $("top-p"),
+      topPVal:   $("topp-val"),
+    };
 
+    el.temp.addEventListener("input", () => el.tempVal.textContent = (+el.temp.value).toFixed(2));
+    el.topP.addEventListener("input", () => el.topPVal.textContent = (+el.topP.value).toFixed(2));
+
+    function chip(text, cls="") {
+      const d = document.createElement("span");
+      d.className = "chip" + (cls ? " " + cls : "");
+      d.textContent = text;
+      return d;
+    }
+
+    // ── Main ask ──────────────────────────────────────────────────────────────
     async function ask() {
-      const question = questionEl.value.trim();
+      const question = el.question.value.trim();
       if (!question) return;
 
-      buttonEl.disabled = true;
-      statusEl.textContent = "thinking...";
-      answerEl.hidden = true;
+      el.send.disabled = true;
+      el.status.textContent = "thinking…";
+      el.answerBox.hidden = true;
+      el.tracePanel.hidden = true;
+      el.ctxWarn.hidden = true;
+      el.debugPanel.hidden = true;
+
+      const body = {
+        question,
+        mode:            el.mode.value,
+        cot:             el.cot.checked,
+        temperature:     +el.temp.value,
+        top_p:           +el.topP.value,
+        enable_rag:      el.rag.checked,
+        enable_security: el.security.checked,
+      };
+      const sid  = el.sessionId.value.trim();
+      const name = el.studentName.value.trim();
+      if (sid)  body.session_id    = sid;
+      if (name) body.student_name  = name;
 
       try {
         const res = await fetch("/ask", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question }),
+          method:  "POST",
+          headers: {"Content-Type": "application/json"},
+          body:    JSON.stringify(body),
         });
-        if (!res.ok) throw new Error("HTTP " + res.status);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({detail: "HTTP " + res.status}));
+          throw new Error(err.detail || "HTTP " + res.status);
+        }
         const data = await res.json();
-        answerEl.textContent = data.answer;
-        answerEl.hidden = false;
+        renderAnswer(data);
       } catch (err) {
-        answerEl.textContent = "Error: " + err.message;
-        answerEl.hidden = false;
+        el.answer.textContent = "Error: " + err.message;
+        el.answerBox.hidden = false;
       } finally {
-        buttonEl.disabled = false;
-        statusEl.textContent = "";
+        el.send.disabled = false;
+        el.status.textContent = "";
       }
     }
 
-    buttonEl.addEventListener("click", ask);
-    // Ctrl/Cmd+Enter also sends.
-    questionEl.addEventListener("keydown", (e) => {
+    function renderAnswer(data) {
+      // Answer + thinking
+      el.answer.textContent = data.answer || "";
+      if (data.thinking) {
+        el.thinking.textContent = "💭 " + data.thinking;
+        el.thinkPanel.hidden = false;
+      } else {
+        el.thinkPanel.hidden = true;
+      }
+
+      // Context warning banner
+      if (data.context_warning) {
+        el.ctxWarn.textContent = data.context_warning;
+        el.ctxWarn.hidden = false;
+      }
+
+      // Sources
+      el.sources.textContent = data.sources && data.sources.length
+        ? "📄 Sources: " + data.sources.join(", ")
+        : "";
+
+      // Meta chips
+      el.meta.innerHTML = "";
+      if (data.input_tokens)  el.meta.appendChild(chip("↑ " + data.input_tokens + " tok"));
+      if (data.output_tokens) el.meta.appendChild(chip("↓ " + data.output_tokens + " tok"));
+      if (data.grounded)      el.meta.appendChild(chip("✓ grounded", "ok"));
+      if (data.compacted)     el.meta.appendChild(chip("🗜 compacted", "warn"));
+      if (data.injection_detected) el.meta.appendChild(chip("⚠ injection blocked", "bad"));
+      if (data.pii_detected)  el.meta.appendChild(chip("🔒 PII redacted: " + data.pii_types.join(", "), "warn"));
+
+      // Context report table
+      if (data.context_report && Object.keys(data.context_report).length) {
+        el.ctxBody.innerHTML = "";
+        for (const [role, tokens] of Object.entries(data.context_report)) {
+          if (tokens === 0) continue;
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td>${role}</td><td>${tokens}</td>`;
+          el.ctxBody.appendChild(tr);
+        }
+        el.debugPanel.hidden = false;
+      }
+
+      el.answerBox.hidden = false;
+    }
+
+    // ── Agent ask (Phase 6) ───────────────────────────────────────────────────
+    async function agentAsk() {
+      const question = el.question.value.trim();
+      if (!question) return;
+      el.send.disabled = true;
+      el.status.textContent = "agent thinking…";
+
+      try {
+        const res  = await fetch("/agent/ask", {
+          method:  "POST",
+          headers: {"Content-Type": "application/json"},
+          body:    JSON.stringify({question}),
+        });
+        const data = await res.json();
+
+        el.answer.textContent = data.answer || "";
+        el.answerBox.hidden   = false;
+
+        if (data.trace && data.trace.length) {
+          el.traceSteps.innerHTML = "";
+          data.trace.forEach((step, i) => {
+            const div = document.createElement("div");
+            div.className = "trace-step";
+            div.innerHTML =
+              `<span class="label">Step ${i+1} · Thought:</span> ${step.thought}\n` +
+              `<span class="label">Action:</span> ${step.action}\n` +
+              `<span class="label">Observation:</span> ${step.observation}`;
+            el.traceSteps.appendChild(div);
+          });
+          el.tracePanel.hidden = false;
+        }
+
+        if (data.halted) {
+          el.meta.innerHTML = "";
+          el.meta.appendChild(chip("⚠ halted: " + data.reason, "bad"));
+          el.answerBox.hidden = false;
+        }
+      } catch (err) {
+        el.answer.textContent = "Error: " + err.message;
+        el.answerBox.hidden = false;
+      } finally {
+        el.send.disabled = false;
+        el.status.textContent = "";
+      }
+    }
+
+    // ── Event listeners ───────────────────────────────────────────────────────
+    el.send.addEventListener("click", ask);
+    el.question.addEventListener("keydown", (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") ask();
     });
   </script>

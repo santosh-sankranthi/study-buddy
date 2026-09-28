@@ -1,53 +1,578 @@
-"""Study Buddy -- v0: deliberately unimpressive.
+"""Study Buddy — the evolving backend.
 
-This is the *starting point* of the whole workshop. It is a single-file FastAPI
-backend whose only job is: take a question, send it raw to the LLM, return the
-answer. There is:
+This file grows every phase. Reading the git diff between any two phase tags
+shows exactly what changed and why.
 
-  * no system prompt  -> generic, inconsistent answers
-  * no history        -> it forgets every previous turn
-  * no memory/notes   -> it cannot ground answers in the student's material
-  * no tools/agents   -> it cannot do anything requiring more than one step
-
-Every later phase exists to fix one visible limitation of this file. That is
-why it is written to be as plain as possible -- the contrast is the lesson.
+Phase progression:
+  v0  — raw one-shot Q&A (the starting point, in the original main.py)
+  v1  — system prompts, CoT, structured output (/flashcards, /quiz-item, /study-plan)
+  v2  — session memory, context compaction, context report, long-context measurement
+  v3  — /embed, /similarity-demo, /notes/upload, /notes/search
+  v4  — grounded RAG in /ask
+  v5  — /agent/ask (ReAct loop), /agent/plan-and-execute
+  v6  — /tools and MCP wiring (server lives in mcp_server/)
+  v7  — security middleware (injection, PII, moderation)
+  v8  — /eval/* endpoints, trace report
 """
 
 from __future__ import annotations
 
+import json
+import os
+import re
 import sys
+import time
 from pathlib import Path
+from typing import Literal
 
-# Make the repo-root `common` package importable when running `uvicorn app.main:app`.
+# Make repo-root importable regardless of launch directory.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from fastapi import FastAPI  # noqa: E402
-from fastapi.responses import FileResponse  # noqa: E402
-from fastapi.staticfiles import StaticFiles  # noqa: E402
-from pydantic import BaseModel  # noqa: E402
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, TypeAdapter
 
-from common.llm import chat  # noqa: E402
+from common.llm import chat
+from common.tokens import count_tokens
+
+from app.prompts import build_few_shot_prompt, build_system
+from app.schemas import Flashcard, QuizItem, StudyPlanDay
+from app.tools import TOOLS
+from app.context import context_budget_warning, context_report
+from app.security import detect_injection, moderate, sanitize_input, scrub_pii
 
 STATIC_DIR = Path(__file__).parent / "static"
 
-app = FastAPI(title="Study Buddy", version="v0")
+app = FastAPI(title="Study Buddy", version="v1-v8")
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Request / Response models
+# ─────────────────────────────────────────────────────────────────────────────
 
 class AskRequest(BaseModel):
-    question: str
+    question:         str
+    mode:             str          = "tutor"      # "tutor" | "direct" | "flashcard"
+    cot:              bool         = False         # chain-of-thought
+    temperature:      float        = 0.7
+    top_p:            float        = 1.0
+    session_id:       str | None   = None
+    student_name:     str | None   = None
+    study_goal:       str | None   = None
+    compact_strategy: str          = "halve"      # "halve" | "keep_last2"
+    enable_rag:       bool         = True          # Phase 4+
+    enable_security:  bool         = True          # Phase 7+
 
 
 class AskResponse(BaseModel):
-    answer: str
+    answer:             str
+    thinking:           str | None  = None
+    grounded:           bool        = False
+    sources:            list[str]   = []
+    input_tokens:       int         = 0
+    output_tokens:      int         = 0
+    context_report:     dict        = {}
+    context_warning:    str | None  = None
+    injection_detected: bool        = False
+    pii_detected:       bool        = False
+    pii_types:          list[str]   = []
+    compacted:          bool        = False
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# /ask — the evolving core endpoint
+# ─────────────────────────────────────────────────────────────────────────────
 
 @app.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest) -> AskResponse:
-    """Send the question raw to the model. One message in, one message out."""
-    # The whole "context" is a single user message. Nothing else.
-    answer = chat([{"role": "user", "content": request.question}])
-    return AskResponse(answer=answer)
+    """Send a question to Study Buddy. Behaviour grows phase by phase."""
 
+    # ── Phase 7: Security — sanitize input ──────────────────────────────────
+    question          = request.question
+    injection_detected = False
+    pii_detected      = False
+    pii_types: list[str] = []
+
+    if request.enable_security:
+        question, injection_detected = sanitize_input(question)
+        question, pii_types = scrub_pii(question)
+        pii_detected = bool(pii_types)
+
+        # Block flagged input entirely.
+        input_mod = moderate(question)
+        if input_mod.get("flagged"):
+            raise HTTPException(
+                status_code=422,
+                detail=f"Request blocked by content policy. Categories: {input_mod.get('categories', {})}",
+            )
+
+    # ── Phase 2.2: Memory — load session history ─────────────────────────────
+    compacted = False
+    history: list[dict] = []
+    if request.session_id:
+        from app.memory import (
+            append, compact_if_needed, compact_keep_last2,
+            get_history, trim_to_token_budget,
+        )
+        # Compact before loading.
+        if request.compact_strategy == "keep_last2":
+            compacted = compact_keep_last2(request.session_id)
+        else:
+            compacted = compact_if_needed(request.session_id)
+
+        history = get_history(request.session_id)
+
+    # ── Phase 1.1: System prompt ─────────────────────────────────────────────
+    system_content = build_system(
+        mode=request.mode,
+        student_name=request.student_name,
+        study_goal=request.study_goal,
+    )
+
+    # ── Phase 4+: RAG retrieval ───────────────────────────────────────────────
+    grounded = False
+    sources: list[str] = []
+    rag_chunks: list[dict] = []
+
+    if request.enable_rag:
+        try:
+            from app.vector_store import retrieve
+            from app.rag import build_rag_prompt, extract_sources
+            chunks = retrieve(question, k=3)
+            if chunks:
+                rag_chunks = chunks
+                sources    = extract_sources(chunks)
+                grounded   = True
+        except Exception:  # noqa: BLE001 — RAG not yet set up is fine
+            pass
+
+    # ── Build the messages list ───────────────────────────────────────────────
+    if grounded and rag_chunks:
+        from app.rag import build_rag_prompt
+        messages = build_rag_prompt(question, rag_chunks)
+        # Prepend history before the rag user message.
+        if history:
+            messages = [messages[0]] + history + [messages[1]]
+    else:
+        messages = []
+        if system_content:
+            messages.append({"role": "system", "content": system_content})
+        messages += history
+
+        # Phase 1.3: CoT injection.
+        user_content = question
+        if request.cot:
+            user_content += (
+                "\n\nThink step by step before answering. "
+                "Wrap your reasoning in <thinking>...</thinking> "
+                "and your final answer in <answer>...</answer>."
+            )
+        messages.append({"role": "user", "content": user_content})
+
+    # No relevant notes found — refuse immediately rather than hallucinate.
+    if request.enable_rag and not grounded:
+        try:
+            from app.vector_store import count
+            if count() > 0:
+                # Notes exist but nothing matched — refuse.
+                return AskResponse(
+                    answer="I don't have enough information in your notes to answer this.",
+                    grounded=False,
+                    input_tokens=count_tokens(question),
+                    output_tokens=0,
+                    context_report=context_report(messages),
+                    injection_detected=injection_detected,
+                    pii_detected=pii_detected,
+                    pii_types=pii_types,
+                )
+        except Exception:  # noqa: BLE001
+            pass
+
+    # ── Phase 2.1: Context warning ────────────────────────────────────────────
+    ctx_warning = context_budget_warning(messages)
+    ctx_report  = context_report(messages)
+
+    # ── Call the LLM ─────────────────────────────────────────────────────────
+    raw_answer = chat(messages, temperature=request.temperature, top_p=request.top_p)
+
+    # ── Phase 7: Moderate output ──────────────────────────────────────────────
+    if request.enable_security:
+        out_mod = moderate(raw_answer)
+        if out_mod.get("flagged"):
+            raw_answer = "[Response blocked by content policy.]"
+
+    # ── Phase 1.3: Parse CoT tags ────────────────────────────────────────────
+    thinking: str | None = None
+    final_answer = raw_answer
+    if request.cot:
+        t_match = re.search(r"<thinking>(.*?)</thinking>", raw_answer, re.DOTALL)
+        a_match = re.search(r"<answer>(.*?)</answer>",    raw_answer, re.DOTALL)
+        if t_match:
+            thinking = t_match.group(1).strip()
+        if a_match:
+            final_answer = a_match.group(1).strip()
+
+    # ── Phase 2.2: Save to memory ─────────────────────────────────────────────
+    if request.session_id:
+        append(request.session_id, "user",      question)
+        append(request.session_id, "assistant", final_answer)
+
+    # ── Phase 0: Token accounting ─────────────────────────────────────────────
+    input_tokens  = count_tokens(" ".join(m.get("content") or "" for m in messages))
+    output_tokens = count_tokens(final_answer)
+
+    return AskResponse(
+        answer=final_answer,
+        thinking=thinking,
+        grounded=grounded,
+        sources=sources,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        context_report=ctx_report,
+        context_warning=ctx_warning,
+        injection_detected=injection_detected,
+        pii_detected=pii_detected,
+        pii_types=pii_types,
+        compacted=compacted,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 1.1: Mode / persona convenience endpoint
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/modes")
+def list_modes() -> list[str]:
+    return ["tutor", "direct", "flashcard"]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 1.2: /quiz-item (few-shot MCQ generation)
+# ─────────────────────────────────────────────────────────────────────────────
+
+QUIZ_EXAMPLES = [
+    {
+        "input":  "Photosynthesis",
+        "output": (
+            '{"question": "Where does photosynthesis occur?", '
+            '"options": ["Mitochondria", "Chloroplast", "Nucleus", "Ribosome"], '
+            '"correct_index": 1}'
+        ),
+    },
+    {
+        "input":  "Newton\'s first law",
+        "output": (
+            '{"question": "What does Newton\'s first law state?", '
+            '"options": ["F = ma", "Objects in motion stay in motion unless acted on", '
+            '"Every action has an equal reaction", "Gravity attracts masses"], '
+            '"correct_index": 1}'
+        ),
+    },
+]
+
+
+@app.post("/quiz-item")
+def make_quiz_item(body: dict) -> dict:
+    topic    = body.get("topic", "")
+    messages = [
+        {"role": "system", "content": "Return ONLY a valid JSON object matching the QuizItem schema. No other text."},
+    ] + build_few_shot_prompt(QUIZ_EXAMPLES, topic)
+    raw  = chat(messages, temperature=0.3)
+    item = QuizItem.model_validate_json(raw)
+
+    # Optionally persist to quiz history.
+    session_id = body.get("session_id")
+    if session_id:
+        from app.memory import add_quiz_item
+        add_quiz_item(session_id, item.model_dump())
+
+    return item.model_dump()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 1.4: /flashcards, /study-plan
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.post("/flashcards")
+def make_flashcards(body: dict) -> dict:
+    topic = body.get("topic", "")
+    messages = [
+        {
+            "role":    "system",
+            "content": (
+                'Return a valid JSON object: {"question":"...","answer":"...","difficulty":"easy|medium|hard"}. '
+                "No other text, no markdown fences."
+            ),
+        },
+        {"role": "user", "content": f"Topic: {topic}"},
+    ]
+    raw  = chat(messages, temperature=0.3)
+    card = Flashcard.model_validate_json(raw)
+    return card.model_dump()
+
+
+@app.post("/study-plan")
+def make_study_plan(body: dict) -> list:
+    subjects    = body.get("subjects", [])
+    total_hours = body.get("total_hours", 4)
+    messages = [
+        {
+            "role":    "system",
+            "content": (
+                "Return a valid JSON array of StudyPlanDay objects. "
+                'Each object: {"subject":"...","topics":["..."],"minutes":<int>}. '
+                f"Total minutes must not exceed {total_hours * 60}. "
+                "No other text, no markdown fences."
+            ),
+        },
+        {
+            "role":    "user",
+            "content": f"Subjects: {', '.join(subjects)}. Total hours available: {total_hours}.",
+        },
+    ]
+    raw  = chat(messages, temperature=0.3)
+    ta   = TypeAdapter(list[StudyPlanDay])
+    plan = ta.validate_json(raw)
+    total_mins = sum(d.minutes for d in plan)
+    if total_mins > total_hours * 60:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Study plan exceeds the time budget: {total_mins} > {total_hours * 60} minutes.",
+        )
+    return [d.model_dump() for d in plan]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 1.5: /tools — list registered tool schemas
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/tools")
+def list_tools() -> list:
+    return TOOLS
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 2.1: /context-report
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/context-report")
+def get_context_report(session_id: str | None = None) -> dict:
+    messages: list[dict] = []
+    if session_id:
+        from app.memory import get_history
+        messages = get_history(session_id)
+    return context_report(messages)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 2.2: /session/{session_id}/history
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/session/{session_id}/history")
+def get_session_history(session_id: str) -> list:
+    from app.memory import get_history
+    return get_history(session_id)
+
+
+@app.delete("/session/{session_id}")
+def clear_session(session_id: str) -> dict:
+    from app.memory import clear
+    clear(session_id)
+    return {"cleared": True, "session_id": session_id}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 2.4: /measure-long-context
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.post("/measure-long-context")
+def measure_long_context(body: dict) -> list:
+    """Measure latency and cost as document token count grows in steps."""
+    import tiktoken
+    doc_text = body.get("text", "")
+    question = "Summarise the above in one sentence."
+    enc      = tiktoken.get_encoding("cl100k_base")
+    results  = []
+
+    PRICE_PER_M_TOKENS = 0.50  # approximate — adjust to the model's real price
+
+    for tokens_target in [500, 1_000, 2_000, 4_000]:
+        ids   = enc.encode(doc_text)[:tokens_target]
+        text  = enc.decode(ids)
+        msgs  = [{"role": "user", "content": text + "\n\n" + question}]
+
+        t0      = time.monotonic()
+        _       = chat(msgs, temperature=0.0)
+        latency = round((time.monotonic() - t0) * 1_000)
+
+        actual_tokens = len(ids)
+        results.append({
+            "target_tokens": tokens_target,
+            "actual_tokens": actual_tokens,
+            "latency_ms":    latency,
+            "est_cost_usd":  round(actual_tokens / 1_000_000 * PRICE_PER_M_TOKENS, 6),
+        })
+    return results
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 3.1 + 3.2: /embed, /similarity-demo
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.post("/embed")
+def embed_endpoint(body: dict) -> dict:
+    from app.embeddings import embed
+    vec = embed(body.get("text", ""))
+    return {"dimensions": len(vec), "preview": vec[:10], "vector": vec}
+
+
+@app.get("/similarity-demo")
+def similarity_demo() -> list:
+    from app.embeddings import DEMO_VECS, rank_by_similarity
+    # Use a query close to the photosynthesis cluster.
+    query_vec = [0.88, 0.12, 0.14]
+    ranked = rank_by_similarity(query_vec, DEMO_VECS)
+    return [{"text": t, "score": round(s, 4)} for t, s in ranked]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 3.3: /semantic-search
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.post("/semantic-search")
+def semantic_search_endpoint(body: dict) -> list:
+    from app.search import semantic_search
+    query = body.get("query", "")
+    docs  = body.get("docs", [])
+    k     = int(body.get("k", 3))
+    return semantic_search(query, docs, k)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 4.1 + 4.2: /notes/upload, /notes/search
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.post("/notes/upload")
+def upload_note(body: dict) -> dict:
+    from app.chunker import chunk_fixed, chunk_paragraph
+    from app.vector_store import count, index_document
+
+    filename = body.get("filename", "untitled.md")
+    content  = body.get("content", "")
+    subject  = body.get("subject", "general")
+    strategy = body.get("chunk_strategy", "fixed")   # "fixed" | "paragraph"
+
+    chunks = chunk_paragraph(content) if strategy == "paragraph" else chunk_fixed(content)
+    if not chunks:
+        chunks = [content]
+
+    for i, chunk in enumerate(chunks):
+        index_document(
+            chunk,
+            metadata={
+                "filename":    filename,
+                "subject":     subject,
+                "chunk_index": i,
+            },
+        )
+    return {
+        "indexed":       True,
+        "filename":      filename,
+        "chunks_created": len(chunks),
+        "total_docs":    count(),
+    }
+
+
+@app.post("/notes/search")
+def search_notes_endpoint(body: dict) -> list:
+    from app.vector_store import search
+    query   = body.get("query", "")
+    k       = int(body.get("k", 3))
+    subject = body.get("subject")
+    return search(query, k=k, subject=subject)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 5.5: /eval/groundedness-report
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/eval/groundedness-report")
+def groundedness_report() -> dict:
+    log_path = Path("./data/groundedness_log.jsonl")
+    if not log_path.exists():
+        return {"checked": 0, "passed": 0, "pass_rate": 0.0}
+    lines  = [json.loads(l) for l in log_path.read_text().splitlines() if l.strip()]
+    passed = sum(1 for l in lines if l.get("grounded"))
+    return {"checked": len(lines), "passed": passed,
+            "pass_rate": round(passed / len(lines), 3) if lines else 0.0}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 6.4: /agent/ask
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.post("/agent/ask")
+def agent_ask(body: dict) -> dict:
+    from app.agent import agent_loop
+    question = body.get("question", "")
+    return agent_loop(question)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 6.5: /agent/plan-and-execute
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.post("/agent/plan-and-execute")
+def agent_plan_and_execute(body: dict) -> dict:
+    from app.agent import plan_and_execute
+    question = body.get("question", "")
+    return plan_and_execute(question)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 9.4: /eval/regression-report
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/eval/regression-report")
+def regression_report() -> dict:
+    """Run a mini built-in eval set and return pass rate."""
+    import requests  # local server must already be running; this is for the eval harness
+
+    EVAL_SET = [
+        {"question": "What is photosynthesis?",             "check": lambda r: "light" in r.lower() or "energy" in r.lower()},
+        {"question": "Where does photosynthesis occur?",    "check": lambda r: "chloro" in r.lower()},
+        {"question": "What gas does photosynthesis release?","check": lambda r: "oxygen" in r.lower() or "o2" in r.lower()},
+        {"question": "What is Newton's second law?",        "check": lambda r: "f" in r.lower() and "m" in r.lower()},
+        {"question": "What is cellular respiration?",       "check": lambda r: "energy" in r.lower() or "atp" in r.lower()},
+    ]
+
+    passed  = 0
+    results = []
+    for case in EVAL_SET:
+        try:
+            resp   = requests.post("http://localhost:8000/ask",
+                                   json={"question": case["question"],
+                                         "mode": "direct", "enable_rag": False},
+                                   timeout=15)
+            answer = resp.json().get("answer", "")
+            ok     = case["check"](answer)
+            passed += int(ok)
+            results.append({"question": case["question"], "passed": ok})
+        except Exception as e:  # noqa: BLE001
+            results.append({"question": case["question"], "passed": False, "error": str(e)})
+
+    return {
+        "total":     len(EVAL_SET),
+        "passed":    passed,
+        "pass_rate": round(passed / len(EVAL_SET), 3),
+        "details":   results,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Static frontend
+# ─────────────────────────────────────────────────────────────────────────────
 
 @app.get("/")
 def index() -> FileResponse:

@@ -114,13 +114,86 @@ through `common/llm.py`, which retries with exponential backoff on rate limits
 and falls back across the model list, so a rate-limit blip during a live class
 does not kill the demo.
 
-## 7. Repo layout
+## 7. Repo layout & Curriculum Map
 
 ```
 study-buddy/
-├── app/                 # the live product (v0..v8)
-├── common/              # shared client: llm.chat() + token counting
-├── data/sample_notes/   # short docs used by the RAG phases
-├── phases/              # phase<N>_<name>/<concept>/{explainer,demo,exercise,solution}
-└── instructor_guides/   # per-phase run-of-show for the instructor
+├── app/                 # The live FastAPI product (v0..v8)
+│   ├── main.py          # Unified FastAPI backend with all endpoints
+│   ├── prompts.py       # Personas, few-shot builders, system prompts
+│   ├── schemas.py       # Pydantic schemas (Flashcard, StudyPlanDay, QuizItem)
+│   ├── tools.py         # Tool schemas and execution registry (search, schedule, grade)
+│   ├── memory.py        # Session history, sliding window, compaction
+│   ├── context.py       # Context token breakdown & metadata injection
+│   ├── security.py      # Prompt injection detection, PII scrubbing, output moderation
+│   ├── chunker.py       # Fixed-size and paragraph chunkers
+│   ├── embeddings.py    # Cosine similarity math + embeddings API batching
+│   ├── search.py        # Semantic search
+│   ├── vector_store.py  # ChromaDB persistent collection
+│   ├── rag.py           # Grounded RAG prompt construction & citations
+│   ├── agent.py         # Autonomous ReAct loop, safety caps, multi-agent planner
+│   ├── evals/           # Groundedness and LLM-as-a-judge evaluators
+│   └── static/          # Single-file HTML/CSS/JS interactive frontend
+├── common/              # Shared client: llm.chat() + token counting
+├── data/sample_notes/   # 13 sample study notes across Biology, Physics, CS
+├── mcp_server/          # Standard Model Context Protocol (MCP) server
+├── scripts/             # smoke_test.py, tag_phases.sh
+└── phases/
+    ├── phase0_fundamentals/       (tokens, context_window, training_vs_inference, sampling)
+    ├── phase1_prompt_engineering/ (system_prompts, few_shot, cot, structured_output, function_calling, react)
+    ├── phase2_context_engineering/ (context_injection, session_memory, context_compaction, long_context, prompt_injection)
+    ├── phase3_embeddings/          (vector_math, embedding_api, semantic_search)
+    ├── phase4_vector_databases/    (vector_db_basics, metadata_filtering)
+    ├── phase5_rag_pipeline/        (chunking, indexing, retrieval, grounded_generation, eval_groundedness)
+    ├── phase6_agents_and_tools/    (function_calling_live, react_loop, agent_safety, multi_agent)
+    ├── phase7_production_evals/    (latency_cost, evals_deterministic, llm_as_judge, regression_testing)
+    ├── phase8_security_safety/     (prompt_injection_advanced, pii_scrubbing, rag_isolation, output_moderation)
+    └── phase9_advanced_capstone/   (fine_tuning_concepts, multimodal, eval_frameworks, capstone)
 ```
+
+## 8. Available API Endpoints
+
+| Endpoint | Method | Phase | Purpose |
+| :--- | :--- | :--- | :--- |
+| `/` | `GET` | All | Interactive browser application |
+| `/ask` | `POST` | 0–5 | Core study buddy Q&A with mode, memory, RAG, and CoT |
+| `/modes` | `GET` | 1 | List available tutor personas |
+| `/quiz-item` | `POST` | 1.2 | Few-shot generated multiple-choice quiz questions |
+| `/flashcards` | `POST` | 1.4 | Validated Pydantic Flashcard generation |
+| `/study-plan` | `POST` | 1.4 | Structured multi-day study schedule |
+| `/tools` | `GET` | 1.5 | List registered tool JSON schemas |
+| `/context-report`| `POST` | 2.1 | Token usage breakdown across prompt roles |
+| `/session/{id}/history` | `GET` | 2.2 | Retrieve full conversation memory for a session |
+| `/session/{id}` | `DELETE`| 2.2 | Clear session memory |
+| `/measure-long-context` | `POST` | 2.4 | Latency & cost benchmarking for expanding token windows |
+| `/similarity-demo` | `GET` | 3.1 | Offline vector cosine similarity ranking demo |
+| `/embed` | `POST` | 3.2 | Generate vector embeddings for input text |
+| `/semantic-search` | `POST` | 3.3 | Pure semantic search ranking over candidate docs |
+| `/notes/upload` | `POST` | 4–5 | Upload, chunk, and index study notes into ChromaDB |
+| `/notes/search` | `POST` | 4–5 | Semantic search over indexed notes with metadata filtering |
+| `/eval/groundedness-report` | `GET` | 5.5 | Groundedness and citation audit log |
+| `/agent/ask` | `POST` | 6.2 | Autonomous ReAct agent loop with execution trace |
+| `/agent/plan-and-execute` | `POST` | 6.5 | Multi-agent Planner $\rightarrow$ Executor $\rightarrow$ Critic pipeline |
+| `/eval/regression-report` | `GET` | 7.4 | Automated regression benchmark report |
+
+## 9. Running the Model Context Protocol (MCP) Server
+
+Study Buddy includes an MCP server wrapping the tools (`search_notes`, `get_exam_schedule`, `calculate_grade`):
+
+```bash
+python mcp_server/server.py
+```
+
+Configure in Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "study-buddy": {
+      "command": "python",
+      "args": ["/path/to/study-buddy/mcp_server/server.py"]
+    }
+  }
+}
+```
+
