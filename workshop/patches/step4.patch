@@ -1,8 +1,8 @@
 diff --git a/app/main.py b/app/main.py
-index c24fe8b..5d42576 100644
+index d67b50f..60a93d0 100644
 --- a/app/main.py
 +++ b/app/main.py
-@@ -54,7 +54,7 @@ from app.context import context_budget_warning, context_report
+@@ -51,7 +51,7 @@ from app.context import context_budget_warning, context_report
  
  STATIC_DIR = _APP_DIR / "static"
  
@@ -11,114 +11,33 @@ index c24fe8b..5d42576 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · /meta — capability manifest  [all phases]
-@@ -63,7 +63,7 @@ app = FastAPI(title="Study Buddy", version="v3")
+@@ -60,7 +60,7 @@ app = FastAPI(title="Study Buddy", version="v3")
  @app.get("/meta")
  def meta() -> dict:
      """What this version supports; the frontend gates its controls on this."""
--    return {"version": "v3", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'embeddings', 'notes']}
-+    return {"version": "v4", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'embeddings', 'notes', 'rag']}
+-    return {"version": "v3", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents']}
++    return {"version": "v4", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp']}
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -80,11 +80,14 @@ class AskRequest(BaseModel):
-     student_name:     str | None = None
-     study_goal:       str | None = None
-     compact_strategy: str        = "halve"   # "halve" | "keep_last2"
-+    enable_rag:       bool       = True      # Phase 4+
+@@ -367,6 +367,20 @@ def agent_plan_and_execute(body: dict) -> dict:
+     from app.agent import plan_and_execute
+     return plan_and_execute(body.get("question", ""))
  
- 
- class AskResponse(BaseModel):
-     answer:          str
-     thinking:        str | None = None
-+    grounded:        bool = False
-+    sources:         list[str] = []
-     input_tokens:    int = 0
-     output_tokens:   int = 0
-     context_report:  dict = {}
-@@ -122,21 +125,62 @@ def ask(request: AskRequest) -> AskResponse:
-         study_goal=request.study_goal,
-     )
- 
--    messages: list[dict] = []
--    if system_content:
--        messages.append({"role": "system", "content": system_content})
--    messages += history
--
--    # ── CONCEPT · Chain of thought [Phase 1.3] ───────────────────────────────
--    # Ask the model to reason step by step, tagged so we can split it out later.
--    user_content = request.question
--    if request.cot:
--        user_content += (
--            "\n\nThink step by step before answering. "
--            "Wrap your reasoning in <thinking>...</thinking> "
--            "and your final answer in <answer>...</answer>."
--        )
--    messages.append({"role": "user", "content": user_content})
-+    # ── CONCEPT · Retrieval [Phase 5] ────────────────────────────────────────
-+    # Semantic-search the notes for the most relevant chunks; None = nothing close.
-+    grounded = False
-+    sources: list[str] = []
-+    rag_chunks: list[dict] = []
-+    if request.enable_rag:
-+        try:
-+            from app.vector_store import retrieve
-+            from app.rag import extract_sources
-+            chunks = retrieve(request.question, k=3)
-+            if chunks:
-+                rag_chunks = chunks
-+                sources    = extract_sources(chunks)
-+                grounded   = True
-+        except Exception:  # noqa: BLE001 — RAG not set up yet is fine
-+            pass
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · MCP  [Phase 4]
++# List tools discovered from the MCP server over stdio.
++# ────────────────────────────────────────────────────────────────────────────
 +
-+    # ── CONCEPT · Grounded generation [Phase 5] ──────────────────────────────
-+    # If we retrieved notes, build a prompt that answers ONLY from those chunks.
-+    if grounded and rag_chunks:
-+        from app.rag import build_rag_prompt
-+        messages = build_rag_prompt(request.question, rag_chunks)
-+        # Prepend history before the RAG user message.
-+        if history:
-+            messages = [messages[0]] + history + [messages[1]]
-+    else:
-+        messages = []
-+        if system_content:
-+            messages.append({"role": "system", "content": system_content})
-+        messages += history
++@app.get("/mcp/tools")
++def mcp_tools() -> list:
++    """List tools discovered from the Study Buddy MCP server (Phase 7)."""
++    from app.mcp_client import list_mcp_tools
++    try:
++        return list_mcp_tools()
++    except Exception as exc:  # noqa: BLE001
++        raise HTTPException(status_code=503, detail=f"MCP server unavailable: {exc}")
 +
-+        # CONCEPT · Chain of thought: ask for step-by-step reasoning.
-+        user_content = request.question
-+        if request.cot:
-+            user_content += (
-+                "\n\nThink step by step before answering. "
-+                "Wrap your reasoning in <thinking>...</thinking> "
-+                "and your final answer in <answer>...</answer>."
-+            )
-+        messages.append({"role": "user", "content": user_content})
-+
-+    # ── CONCEPT · Refusal [Phase 5] ──────────────────────────────────────────
-+    # Notes exist but nothing matched: say "I don't know" instead of guessing.
-+    if request.enable_rag and not grounded:
-+        try:
-+            from app.vector_store import count
-+            if count() > 0:
-+                return AskResponse(
-+                    answer="I don't have enough information in your notes to answer this.",
-+                    grounded=False,
-+                    input_tokens=count_tokens(request.question),
-+                    context_report=context_report(messages),
-+                    compacted=compacted,
-+                )
-+        except Exception:  # noqa: BLE001
-+            pass
- 
-     # ── CONCEPT · Context window [Phase 2.1] ─────────────────────────────────
-     # Measure the tokens the prompt uses and warn before we hit the model's limit.
-@@ -166,6 +210,8 @@ def ask(request: AskRequest) -> AskResponse:
-     return AskResponse(
-         answer=final_answer,
-         thinking=thinking,
-+        grounded=grounded,
-+        sources=sources,
-         input_tokens=input_tokens,
-         output_tokens=count_tokens(final_answer),
-         context_report=ctx_report,
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · Frontend  [all phases]
+ # Serve the single-page UI; every phase of the workshop is driven through it.

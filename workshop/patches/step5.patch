@@ -1,8 +1,8 @@
 diff --git a/app/main.py b/app/main.py
-index 5d42576..f17ad63 100644
+index 60a93d0..cd69095 100644
 --- a/app/main.py
 +++ b/app/main.py
-@@ -54,7 +54,7 @@ from app.context import context_budget_warning, context_report
+@@ -51,7 +51,7 @@ from app.context import context_budget_warning, context_report
  
  STATIC_DIR = _APP_DIR / "static"
  
@@ -11,35 +11,107 @@ index 5d42576..f17ad63 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · /meta — capability manifest  [all phases]
-@@ -63,7 +63,7 @@ app = FastAPI(title="Study Buddy", version="v4")
+@@ -60,7 +60,7 @@ app = FastAPI(title="Study Buddy", version="v4")
  @app.get("/meta")
  def meta() -> dict:
      """What this version supports; the frontend gates its controls on this."""
--    return {"version": "v4", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'embeddings', 'notes', 'rag']}
-+    return {"version": "v5", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'embeddings', 'notes', 'rag', 'agents']}
+-    return {"version": "v4", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp']}
++    return {"version": "v5", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp', 'security']}
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -474,6 +474,22 @@ def search_notes_endpoint(body: dict) -> list:
-     from app.vector_store import search
-     return search(body.get("query", ""), k=int(body.get("k", 3)), subject=body.get("subject"))
+@@ -77,16 +77,20 @@ class AskRequest(BaseModel):
+     student_name:     str | None = None
+     study_goal:       str | None = None
+     compact_strategy: str        = "halve"   # "halve" | "keep_last2"
++    enable_security:  bool       = True      # Phase 5+
  
-+# ────────────────────────────────────────────────────────────────────────────
-+# CONCEPT · Agents  [Phase 6]
-+# A ReAct loop that calls tools, plus a planner->executor->critic pipeline.
-+# ────────────────────────────────────────────────────────────────────────────
-+
-+@app.post("/agent/ask")
-+def agent_ask(body: dict) -> dict:
-+    from app.agent import agent_loop
-+    return agent_loop(body.get("question", ""))
-+
-+
-+@app.post("/agent/plan-and-execute")
-+def agent_plan_and_execute(body: dict) -> dict:
-+    from app.agent import plan_and_execute
-+    return plan_and_execute(body.get("question", ""))
-+
+ 
+ class AskResponse(BaseModel):
+-    answer:          str
+-    thinking:        str | None = None
+-    input_tokens:    int = 0
+-    output_tokens:   int = 0
+-    context_report:  dict = {}
+-    context_warning: str | None = None
+-    compacted:       bool = False
++    answer:             str
++    thinking:           str | None = None
++    input_tokens:       int = 0
++    output_tokens:      int = 0
++    context_report:     dict = {}
++    context_warning:    str | None = None
++    injection_detected: bool = False
++    pii_detected:       bool = False
++    pii_types:          list[str] = []
++    compacted:          bool = False
+ 
  # ────────────────────────────────────────────────────────────────────────────
- # CONCEPT · Frontend  [all phases]
- # Serve the single-page UI; every phase of the workshop is driven through it.
+ # CONCEPT · /ask — the core endpoint  [Phase 0-6]
+@@ -97,6 +101,25 @@ class AskResponse(BaseModel):
+ def ask(request: AskRequest) -> AskResponse:
+     """Send a question to Study Buddy. Behaviour grows phase by phase."""
+ 
++    # ── CONCEPT · Prompt injection + PII [Phase 5] ───────────────────────────
++    # Strip injected instructions and redact personal data before anything runs.
++    question           = request.question
++    injection_detected = False
++    pii_detected       = False
++    pii_types: list[str] = []
++
++    if request.enable_security:
++        question, injection_detected = sanitize_input(question)
++        question, pii_types          = scrub_pii(question)
++        pii_detected                 = bool(pii_types)
++
++        input_mod = moderate(question)
++        if input_mod.get("flagged"):
++            raise HTTPException(
++                status_code=422,
++                detail=f"Request blocked by content policy. Categories: {input_mod.get('categories', {})}",
++            )
++
+     # ── CONCEPT · Memory [Phase 2.2] ─────────────────────────────────────────
+     # Reload earlier turns so the tutor remembers. Compaction shrinks long history.
+     compacted = False
+@@ -126,7 +149,7 @@ def ask(request: AskRequest) -> AskResponse:
+ 
+     # ── CONCEPT · Chain of thought [Phase 1.3] ───────────────────────────────
+     # Ask the model to reason step by step, tagged so we can split it out later.
+-    user_content = request.question
++    user_content = question
+     if request.cot:
+         user_content += (
+             "\n\nThink step by step before answering. "
+@@ -143,6 +166,12 @@ def ask(request: AskRequest) -> AskResponse:
+     # ── The model call itself (the one thing v0 already did) ─────────────────
+     raw_answer = chat(messages, temperature=request.temperature, top_p=request.top_p)
+ 
++    # ── CONCEPT · Moderation [Phase 5] — check the model's output too ────────
++    if request.enable_security:
++        out_mod = moderate(raw_answer)
++        if out_mod.get("flagged"):
++            raw_answer = "[Response blocked by content policy.]"
++
+     # ── CONCEPT · Chain of thought — separate reasoning from the answer ──────
+     thinking: str | None = None
+     final_answer = raw_answer
+@@ -156,7 +185,7 @@ def ask(request: AskRequest) -> AskResponse:
+ 
+     # ── CONCEPT · Memory — store this turn so the next one remembers it ──────
+     if request.session_id:
+-        append(request.session_id, "user", request.question)
++        append(request.session_id, "user", question)
+         append(request.session_id, "assistant", final_answer)
+ 
+     input_tokens = count_tokens(" ".join(m.get("content") or "" for m in messages))
+@@ -167,6 +196,9 @@ def ask(request: AskRequest) -> AskResponse:
+         output_tokens=count_tokens(final_answer),
+         context_report=ctx_report,
+         context_warning=ctx_warning,
++        injection_detected=injection_detected,
++        pii_detected=pii_detected,
++        pii_types=pii_types,
+         compacted=compacted,
+     )
+ 

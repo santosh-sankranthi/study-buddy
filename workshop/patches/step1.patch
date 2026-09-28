@@ -1,8 +1,8 @@
 diff --git a/app/main.py b/app/main.py
-index 96c6f53..8d911e1 100644
+index 511041e..f9b0403 100644
 --- a/app/main.py
 +++ b/app/main.py
-@@ -28,6 +28,7 @@ How to read this file
+@@ -26,6 +26,7 @@ How to read this file
  from __future__ import annotations
  
  import sys
@@ -10,7 +10,7 @@ index 96c6f53..8d911e1 100644
  from pathlib import Path
  
  # Locate the app package by walking up from this file, so this module works
-@@ -37,17 +38,20 @@ while _APP_DIR.name != "app" and _APP_DIR.parent != _APP_DIR:
+@@ -35,17 +36,20 @@ while _APP_DIR.name != "app" and _APP_DIR.parent != _APP_DIR:
      _APP_DIR = _APP_DIR.parent
  sys.path.insert(0, str(_APP_DIR.parent))
  
@@ -34,7 +34,7 @@ index 96c6f53..8d911e1 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · /meta — capability manifest  [all phases]
-@@ -56,14 +60,26 @@ app = FastAPI(title="Study Buddy", version="v0")
+@@ -54,14 +58,26 @@ app = FastAPI(title="Study Buddy", version="v0")
  @app.get("/meta")
  def meta() -> dict:
      """What this version supports; the frontend gates its controls on this."""
@@ -63,8 +63,8 @@ index 96c6f53..8d911e1 100644
 +    output_tokens: int = 0
  
  # ────────────────────────────────────────────────────────────────────────────
- # CONCEPT · /ask — the core endpoint  [Phase 0-9]
-@@ -72,12 +88,158 @@ class AskResponse(BaseModel):
+ # CONCEPT · /ask — the core endpoint  [Phase 0-6]
+@@ -70,12 +86,158 @@ class AskResponse(BaseModel):
  
  @app.post("/ask", response_model=AskResponse)
  def ask(request: AskRequest) -> AskResponse:

@@ -1,17 +1,16 @@
 diff --git a/app/main.py b/app/main.py
-index 8d911e1..be22f51 100644
+index f9b0403..05ac079 100644
 --- a/app/main.py
 +++ b/app/main.py
-@@ -29,6 +29,8 @@ from __future__ import annotations
+@@ -27,6 +27,7 @@ from __future__ import annotations
  
  import sys
  import re
 +import time
-+import urllib.request
  from pathlib import Path
  
  # Locate the app package by walking up from this file, so this module works
-@@ -48,10 +50,11 @@ from common.tokens import count_tokens
+@@ -46,10 +47,11 @@ from common.tokens import count_tokens
  from app.prompts import build_few_shot_prompt, build_system
  from app.schemas import Flashcard, QuizItem, StudyPlanDay
  from app.tools import TOOLS
@@ -24,7 +23,7 @@ index 8d911e1..be22f51 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · /meta — capability manifest  [all phases]
-@@ -60,7 +63,7 @@ app = FastAPI(title="Study Buddy", version="v1")
+@@ -58,7 +60,7 @@ app = FastAPI(title="Study Buddy", version="v1")
  @app.get("/meta")
  def meta() -> dict:
      """What this version supports; the frontend gates its controls on this."""
@@ -33,7 +32,7 @@ index 8d911e1..be22f51 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -68,18 +71,25 @@ def meta() -> dict:
+@@ -66,18 +68,25 @@ def meta() -> dict:
  # ────────────────────────────────────────────────────────────────────────────
  
  class AskRequest(BaseModel):
@@ -67,8 +66,8 @@ index 8d911e1..be22f51 100644
 +    compacted:       bool = False
  
  # ────────────────────────────────────────────────────────────────────────────
- # CONCEPT · /ask — the core endpoint  [Phase 0-9]
-@@ -89,13 +99,36 @@ class AskResponse(BaseModel):
+ # CONCEPT · /ask — the core endpoint  [Phase 0-6]
+@@ -87,13 +96,36 @@ class AskResponse(BaseModel):
  @app.post("/ask", response_model=AskResponse)
  def ask(request: AskRequest) -> AskResponse:
      """Send a question to Study Buddy. Behaviour grows phase by phase."""
@@ -107,7 +106,7 @@ index 8d911e1..be22f51 100644
      user_content = request.question
      if request.cot:
          user_content += (
-@@ -105,8 +138,15 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -103,8 +135,15 @@ def ask(request: AskRequest) -> AskResponse:
          )
      messages.append({"role": "user", "content": user_content})
  
@@ -123,7 +122,7 @@ index 8d911e1..be22f51 100644
      thinking: str | None = None
      final_answer = raw_answer
      if request.cot:
-@@ -117,11 +157,20 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -115,11 +154,20 @@ def ask(request: AskRequest) -> AskResponse:
          if a_match:
              final_answer = a_match.group(1).strip()
  
@@ -145,7 +144,7 @@ index 8d911e1..be22f51 100644
      )
  
  # ────────────────────────────────────────────────────────────────────────────
-@@ -241,6 +290,70 @@ def make_study_plan(body: dict) -> list:
+@@ -239,6 +287,70 @@ def make_study_plan(body: dict) -> list:
  def list_tools() -> list:
      return TOOLS
  
