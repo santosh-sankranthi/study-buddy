@@ -86,6 +86,15 @@ reveals more of the console (persona/mode, sampling sliders, memory, notes,
 grounding badge, agent trace, MCP, security chips, eval reports) until `v8`
 shows everything. This is how students *see* the product grow, not just hear it.
 
+### The UI is a chat from the start
+
+The frontend is a conversation log, not a single-answer panel. Importantly, the
+chat exists at **every** version, but memory does not: at `v0`/`v1` the backend
+ignores the session id, so the tutor visibly *forgets* between turns — the hook
+for the whole context-engineering phase. From `v2` the session id is honoured,
+a Session field and New Session button appear, and reloading a session restores
+its history from the server.
+
 ## 4. Run a phase's demo / exercise
 
 Every demo and exercise is a plain script. Run it from the repo root (the

@@ -971,6 +971,106 @@
       .action-row { width: 100%; justify-content: stretch; }
       .btn-tactile { flex: 1; }
     }
+    /* ── Conversation log (chat) ───────────────────────────────────────────── */
+    .chat-log {
+      margin-top: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.9rem;
+      max-height: 52vh;
+      overflow-y: auto;
+      padding: 1rem;
+      background: #0e1219;
+      border: 1px solid #232b3c;
+      border-radius: var(--radius-lg);
+      box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.85), 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+    .chat-empty {
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      text-align: center;
+      padding: 1.5rem 0;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .msg { display: flex; flex-direction: column; max-width: 88%; }
+    .msg.user { align-self: flex-end; align-items: flex-end; }
+    .msg.assistant { align-self: flex-start; }
+    .msg.system {
+      align-self: center;
+      max-width: 95%;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      text-align: center;
+      border: 1px dashed var(--bay-border);
+      border-radius: 8px;
+      padding: 0.4rem 0.8rem;
+    }
+    .msg-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.6rem;
+      width: 100%;
+      margin-bottom: 0.35rem;
+    }
+    .msg-role {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--brass-mid);
+    }
+    .msg-body {
+      font-size: 0.92rem;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      user-select: text;
+      padding: 0.8rem 1rem;
+      border-radius: 10px;
+      background: #141822;
+      border: 1px solid #283142;
+      color: var(--text-parchment);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+    .msg.user .msg-body {
+      background: linear-gradient(180deg, rgba(37, 99, 235, 0.18), rgba(37, 99, 235, 0.08));
+      border-color: rgba(37, 99, 235, 0.35);
+      color: var(--text-ivory);
+    }
+    .msg.assistant .msg-body { max-width: 100%; }
+    .msg-details {
+      margin-top: 0.6rem;
+      background: #0d1017;
+      border: 1px solid var(--bay-border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7);
+    }
+    .msg-details summary {
+      padding: 0.5rem 0.8rem;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      background: #141822;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      outline: none;
+    }
+    .msg-details summary:hover { color: var(--text-ivory); }
+    .ctx-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+    }
+    .ctx-table td {
+      padding: 0.35rem 0.8rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text-muted);
+    }
+    .ctx-table td:first-child { color: var(--text-parchment); }
+
     /* ── Version capability gating ─────────────────────────────────────────── */
     /* Controls/panels tagged data-feature="X" are hidden unless the running
        backend's /meta endpoint reports that it supports feature X. This is what
@@ -1122,6 +1222,10 @@
 
     <!-- ── Tactile Action Buttons ── -->
     <div class="action-row">
+      <button type="button" class="btn-tactile secondary" id="new-session-btn" data-feature="memory" title="Clear this conversation and start a new session">
+        <span>↺</span> New Session
+      </button>
+
       <button type="button" class="btn-tactile secondary" id="agent-btn" data-feature="agents" title="Execute multi-step ReAct Agent loop (Phase 6)">
         <span>🔍</span> Ask Agent Loop
       </button>
@@ -1137,51 +1241,15 @@
     <!-- ── Missing API Key Helper Banner (Rendered dynamically if error occurs) ── -->
     <div id="api-alert" hidden></div>
 
-    <!-- ── Monitor / Response Display Bay ── -->
-    <section id="answer-box" hidden aria-live="polite">
-      <div class="monitor-bezel-header">
-        <span class="monitor-label">
-          <span>◈</span> Synthesis Output
-        </span>
-        <button type="button" class="copy-btn" id="copy-btn" title="Copy answer text">
-          <span>📋</span> Copy
-        </button>
+    <!-- ── Conversation Log (chat) ── -->
+    <!-- Each turn appends here. Per-answer extras (thinking trace, sources,
+         agent trace, context report) attach to the assistant message that
+         produced them, so later phases visibly enrich every individual reply. -->
+    <section id="chat-log" class="chat-log" aria-live="polite">
+      <div class="chat-empty" id="chat-empty">
+        Ask a question to begin the session…
       </div>
-
-      <!-- Chain of Thought Thinking Panel -->
-      <div id="thinking-panel" hidden>
-        <div class="thinking-bubble" id="thinking"></div>
-      </div>
-
-      <!-- Primary Answer Text -->
-      <div class="answer-bubble" id="answer"></div>
-
-      <!-- Sources -->
-      <div class="sources" id="sources"></div>
-
-      <!-- Metadata Verification Chips -->
-      <div class="meta" id="meta"></div>
     </section>
-
-    <!-- ── Agent Trace Panel (Phase 6) ── -->
-    <details id="trace-panel" data-feature="agents" hidden>
-      <summary>🔍 Multi-Step Agent Trace &amp; Reasoning Log</summary>
-      <div id="trace-steps"></div>
-    </details>
-
-    <!-- ── Debug: Context Token Report ── -->
-    <details id="debug-panel" data-feature="context" hidden>
-      <summary>🛠️ Context Token Distribution Matrix</summary>
-      <table id="ctx-table">
-        <thead>
-          <tr>
-            <th>Role / Component</th>
-            <th>Tokens Allocated</th>
-          </tr>
-        </thead>
-        <tbody id="ctx-body"></tbody>
-      </table>
-    </details>
 
     <!-- ── Notes & Vector Search Panel (Phases 3–4) ── -->
     <details id="notes-panel" class="feature-off" data-feature="notes">
@@ -1237,22 +1305,14 @@
       send:        $("send"),
       agentBtn:    $("agent-btn"),
       clearBtn:    $("clear-btn"),
-      copyBtn:     $("copy-btn"),
+      newSessionBtn: $("new-session-btn"),
       status:      $("status"),
       statusLed:   $("status-led"),
       ver:         $("ver"),
       apiAlert:    $("api-alert"),
-      answer:      $("answer"),
-      thinking:    $("thinking"),
-      answerBox:   $("answer-box"),
-      thinkPanel:  $("thinking-panel"),
       ctxWarn:     $("ctx-warning"),
-      sources:     $("sources"),
-      meta:        $("meta"),
-      tracePanel:  $("trace-panel"),
-      traceSteps:  $("trace-steps"),
-      debugPanel:  $("debug-panel"),
-      ctxBody:     $("ctx-body"),
+      chatLog:     $("chat-log"),
+      chatEmpty:   $("chat-empty"),
       mode:        $("mode"),
       sessionId:   $("session-id"),
       studentName: $("student-name"),
@@ -1292,23 +1352,10 @@
       });
     });
 
-    // ── Clear & Copy Helpers ─────────────────────────────────────────────────
+    // ── Clear Helper ─────────────────────────────────────────────────────────
     el.clearBtn.addEventListener("click", () => {
       el.question.value = "";
       el.question.focus();
-    });
-
-    el.copyBtn.addEventListener("click", async () => {
-      const textToCopy = el.answer.textContent;
-      if (!textToCopy) return;
-      try {
-        await navigator.clipboard.writeText(textToCopy);
-        const originalHtml = el.copyBtn.innerHTML;
-        el.copyBtn.innerHTML = "<span>✓</span> Copied";
-        setTimeout(() => el.copyBtn.innerHTML = originalHtml, 2000);
-      } catch (err) {
-        console.error("Clipboard write failed", err);
-      }
     });
 
     // ── LED Status Helper ────────────────────────────────────────────────────
@@ -1327,6 +1374,161 @@
       return d;
     }
 
+    // ── Conversation Log Builders ────────────────────────────────────────────
+    // The UI is a chat from v0. The difference across versions is whether the
+    // backend remembers: before v2 the session id is ignored, so the tutor
+    // visibly forgets between turns -- the hook for the whole memory phase.
+    function escapeHtml(s) {
+      return String(s == null ? "" : s)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function scrollChat() {
+      if (el.chatLog) el.chatLog.scrollTop = el.chatLog.scrollHeight;
+    }
+
+    function clearEmptyState() {
+      if (el.chatEmpty && el.chatEmpty.parentNode) el.chatEmpty.remove();
+    }
+
+    function addUserMessage(text) {
+      clearEmptyState();
+      const node = document.createElement("div");
+      node.className = "msg user";
+      const body = document.createElement("div");
+      body.className = "msg-body";
+      body.textContent = text;
+      node.appendChild(body);
+      el.chatLog.appendChild(node);
+      scrollChat();
+    }
+
+    function addSystemMessage(text) {
+      clearEmptyState();
+      const node = document.createElement("div");
+      node.className = "msg system";
+      node.textContent = text;
+      el.chatLog.appendChild(node);
+      scrollChat();
+    }
+
+    function addAssistantMessage(data) {
+      clearEmptyState();
+      const node = document.createElement("div");
+      node.className = "msg assistant";
+
+      const head = document.createElement("div");
+      head.className = "msg-head";
+      const role = document.createElement("span");
+      role.className = "msg-role";
+      role.textContent = "🎓 Study Buddy";
+      head.appendChild(role);
+
+      const copy = document.createElement("button");
+      copy.type = "button";
+      copy.className = "copy-btn";
+      copy.innerHTML = "<span>📋</span> Copy";
+      copy.addEventListener("click", async () => {
+        try {
+          const body = node.querySelector(".msg-body");
+          await navigator.clipboard.writeText(body ? body.textContent : "");
+          copy.innerHTML = "<span>✓</span> Copied";
+          setTimeout(() => copy.innerHTML = "<span>📋</span> Copy", 1500);
+        } catch (e) { /* clipboard not available */ }
+      });
+      head.appendChild(copy);
+      node.appendChild(head);
+
+      if (data.thinking) {
+        const d = document.createElement("details");
+        d.className = "msg-details";
+        d.open = true;
+        d.innerHTML = `<summary>💭 Reasoning trace</summary>` +
+          `<div class="thinking-bubble">${escapeHtml(data.thinking)}</div>`;
+        node.appendChild(d);
+      }
+
+      const body = document.createElement("div");
+      body.className = "msg-body";
+      body.textContent = data.answer || data.final_answer || "";
+      node.appendChild(body);
+
+      if (data.sources && data.sources.length) {
+        const s = document.createElement("div");
+        s.className = "sources";
+        s.innerHTML = `<span>📄</span> <strong>Cited:</strong> ${escapeHtml(data.sources.join(", "))}`;
+        node.appendChild(s);
+      }
+
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      if (data.input_tokens)       meta.appendChild(chip("↑ " + data.input_tokens + " tok"));
+      if (data.output_tokens)      meta.appendChild(chip("↓ " + data.output_tokens + " tok"));
+      if (data.grounded)           meta.appendChild(chip("✓ Grounded in Notes", "ok"));
+      if (data.compacted)          meta.appendChild(chip("🗜 Compaction Triggered", "warn"));
+      if (data.injection_detected) meta.appendChild(chip("🛡️ Prompt Injection Neutralized", "bad"));
+      if (data.pii_detected)       meta.appendChild(chip("🔒 PII Redacted: " + (data.pii_types || []).join(", "), "warn"));
+      if (data.halted)             meta.appendChild(chip("⚠️ Agent loop halted: " + data.reason, "bad"));
+      if (meta.childNodes.length) node.appendChild(meta);
+
+      if (data.trace && data.trace.length) {
+        const d = document.createElement("details");
+        d.className = "msg-details";
+        d.open = true;
+        let html = "<summary>🔍 Agent trace</summary>";
+        data.trace.forEach((step, i) => {
+          html +=
+            `<div class="trace-step"><span class="label">Step ${i + 1} · Thought:</span> ${escapeHtml(step.thought)}\n` +
+            `<span class="label">Action:</span> ${escapeHtml(step.action)}\n` +
+            `<span class="label">Observation:</span> ${escapeHtml(step.observation)}</div>`;
+        });
+        d.innerHTML = html;
+        node.appendChild(d);
+      }
+
+      if (data.context_report && Object.keys(data.context_report).length) {
+        const rows = Object.entries(data.context_report)
+          .filter(([, v]) => v > 0)
+          .map(([r, v]) => `<tr><td><strong>${escapeHtml(r)}</strong></td><td>${v.toLocaleString()} tok</td></tr>`)
+          .join("");
+        if (rows) {
+          const d = document.createElement("details");
+          d.className = "msg-details";
+          d.innerHTML = `<summary>🛠️ Context tokens</summary><table class="ctx-table"><tbody>${rows}</tbody></table>`;
+          node.appendChild(d);
+        }
+      }
+
+      el.chatLog.appendChild(node);
+      scrollChat();
+    }
+
+    function ensureSession() {
+      let sid = el.sessionId.value.trim();
+      if (!sid) {
+        sid = "sess-" + Math.random().toString(36).slice(2, 8);
+        el.sessionId.value = sid;
+      }
+      return sid;
+    }
+
+    async function loadHistoryIfAny() {
+      // Only versions that support memory expose the session history endpoint.
+      if (!META_LOADED || !FEATURES.has("memory")) return;
+      const sid = el.sessionId.value.trim();
+      if (!sid) return;
+      try {
+        const res = await fetch(`/session/${encodeURIComponent(sid)}/history`);
+        if (!res.ok) return;
+        const msgs = await res.json();
+        msgs.forEach(m => {
+          if (m.role === "user")           addUserMessage(m.content);
+          else if (m.role === "assistant") addAssistantMessage({answer: m.content});
+          else                             addSystemMessage(m.content);
+        });
+      } catch (e) { /* session endpoint unavailable */ }
+    }
+
     // ── Main Ask Pipeline ────────────────────────────────────────────────────
     async function ask() {
       const question = el.question.value.trim();
@@ -1335,14 +1537,12 @@
         return;
       }
 
+      addUserMessage(question);
+      el.question.value = "";
       el.send.disabled = true;
       if (el.agentBtn) el.agentBtn.disabled = true;
       setStatus("busy", "Synthesizing…");
-
-      el.answerBox.hidden = true;
-      el.tracePanel.hidden = true;
       el.ctxWarn.hidden = true;
-      el.debugPanel.hidden = true;
       el.apiAlert.hidden = true;
 
       const body = {
@@ -1353,10 +1553,9 @@
         top_p:           +el.topP.value,
         enable_rag:      el.rag.checked,
         enable_security: el.security.checked,
+        session_id:      ensureSession(),
       };
-      const sid  = el.sessionId.value.trim();
       const name = el.studentName.value.trim();
-      if (sid)  body.session_id   = sid;
       if (name) body.student_name = name;
 
       try {
@@ -1373,7 +1572,12 @@
         }
 
         const data = await res.json();
-        renderAnswer(data);
+        addAssistantMessage(data);
+
+        if (data.context_warning) {
+          el.ctxWarn.innerHTML = `<span>⚠️</span> ${escapeHtml(data.context_warning)}`;
+          el.ctxWarn.hidden = false;
+        }
         setStatus("ready", "Ready");
       } catch (err) {
         handleApiError(err.message);
@@ -1381,57 +1585,6 @@
         el.send.disabled = false;
         if (el.agentBtn) el.agentBtn.disabled = false;
       }
-    }
-
-    // ── Render Response ──────────────────────────────────────────────────────
-    function renderAnswer(data) {
-      el.answer.textContent = data.answer || "";
-
-      // CoT Thinking panel
-      if (data.thinking) {
-        el.thinking.textContent = "💭 Neural Reasoning Trace:\n" + data.thinking;
-        el.thinkPanel.hidden = false;
-      } else {
-        el.thinkPanel.hidden = true;
-      }
-
-      // Context warning banner
-      if (data.context_warning) {
-        el.ctxWarn.innerHTML = `<span>⚠️</span> ${data.context_warning}`;
-        el.ctxWarn.hidden = false;
-      }
-
-      // Sources citation
-      if (data.sources && data.sources.length) {
-        el.sources.innerHTML = `<span>📄</span> <strong>Cited Sources:</strong> ${data.sources.join(", ")}`;
-        el.sources.hidden = false;
-      } else {
-        el.sources.innerHTML = "";
-        el.sources.hidden = true;
-      }
-
-      // Meta chips
-      el.meta.innerHTML = "";
-      if (data.input_tokens)  el.meta.appendChild(chip("↑ " + data.input_tokens + " tok"));
-      if (data.output_tokens) el.meta.appendChild(chip("↓ " + data.output_tokens + " tok"));
-      if (data.grounded)      el.meta.appendChild(chip("✓ Grounded in Notes", "ok"));
-      if (data.compacted)     el.meta.appendChild(chip("🗜 Compaction Triggered", "warn"));
-      if (data.injection_detected) el.meta.appendChild(chip("🛡️ Prompt Injection Neutralized", "bad"));
-      if (data.pii_detected)  el.meta.appendChild(chip("🔒 PII Redacted: " + data.pii_types.join(", "), "warn"));
-
-      // Context report table
-      if (data.context_report && Object.keys(data.context_report).length) {
-        el.ctxBody.innerHTML = "";
-        for (const [role, tokens] of Object.entries(data.context_report)) {
-          if (tokens === 0) continue;
-          const tr = document.createElement("tr");
-          tr.innerHTML = `<td><strong>${role}</strong></td><td>${tokens.toLocaleString()} tok</td>`;
-          el.ctxBody.appendChild(tr);
-        }
-        el.debugPanel.hidden = false;
-      }
-
-      el.answerBox.hidden = false;
     }
 
     // ── Error Handling Card ──────────────────────────────────────────────────
@@ -1458,8 +1611,7 @@
         `;
         el.apiAlert.hidden = false;
       } else {
-        el.answer.textContent = "Error: " + errorMessage;
-        el.answerBox.hidden = false;
+        addAssistantMessage({answer: "Error: " + errorMessage});
       }
     }
 
@@ -1471,12 +1623,11 @@
         return;
       }
 
+      addUserMessage(question);
+      el.question.value = "";
       el.send.disabled = true;
       if (el.agentBtn) el.agentBtn.disabled = true;
       setStatus("busy", "Agent ReAct…");
-
-      el.answerBox.hidden = true;
-      el.tracePanel.hidden = true;
       el.apiAlert.hidden = true;
 
       try {
@@ -1493,28 +1644,12 @@
         }
 
         const data = await res.json();
-        el.answer.textContent = data.answer || "";
-        el.answerBox.hidden   = false;
-
-        if (data.trace && data.trace.length) {
-          el.traceSteps.innerHTML = "";
-          data.trace.forEach((step, i) => {
-            const div = document.createElement("div");
-            div.className = "trace-step";
-            div.innerHTML =
-              `<span class="label">Step ${i+1} · Thought:</span> ${step.thought}\n` +
-              `<span class="label">Action:</span> ${step.action}\n` +
-              `<span class="label">Observation:</span> ${step.observation}`;
-            el.traceSteps.appendChild(div);
-          });
-          el.tracePanel.hidden = false;
-        }
-
-        if (data.halted) {
-          el.meta.innerHTML = "";
-          el.meta.appendChild(chip("⚠️ Agent Loop Halted: " + data.reason, "bad"));
-        }
-
+        addAssistantMessage({
+          answer: data.answer,
+          trace:  data.trace,
+          halted: data.halted,
+          reason: data.reason,
+        });
         setStatus("ready", "Ready");
       } catch (err) {
         handleApiError(err.message);
@@ -1617,6 +1752,26 @@
     $("groundedness-btn").addEventListener("click", () => showEval("/eval/groundedness-report"));
     $("regression-btn").addEventListener("click", () => showEval("/eval/regression-report"));
 
+    // ── New Session (memory versions only) ───────────────────────────────────
+    if (el.newSessionBtn) {
+      el.newSessionBtn.addEventListener("click", async () => {
+        const sid = el.sessionId.value.trim();
+        if (sid && META_LOADED && FEATURES.has("memory")) {
+          try { await fetch(`/session/${encodeURIComponent(sid)}`, {method: "DELETE"}); }
+          catch (e) { /* ignore */ }
+        }
+        el.chatLog.innerHTML = "";
+        el.sessionId.value = "";
+        const empty = document.createElement("div");
+        empty.className = "chat-empty";
+        empty.id = "chat-empty";
+        empty.textContent = "Ask a question to begin the session…";
+        el.chatLog.appendChild(empty);
+        el.chatEmpty = empty;
+        setStatus("ready", "New session");
+      });
+    }
+
     // ── Event Listeners ──────────────────────────────────────────────────────
     el.send.addEventListener("click", ask);
     if (el.agentBtn) el.agentBtn.addEventListener("click", agentAsk);
@@ -1628,8 +1783,8 @@
       }
     });
 
-    // ── Boot: ask the backend which capabilities this version has ────────────
-    loadMeta();
+    // ── Boot: learn capabilities, then restore any session history ───────────
+    loadMeta().then(loadHistoryIfAny);
   </script>
 </body>
 </html>
