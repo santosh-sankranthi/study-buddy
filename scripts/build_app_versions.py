@@ -922,6 +922,47 @@ def regression_report() -> dict:
     }'''
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# /meta — the capability manifest the frontend uses to adapt the UI
+# ─────────────────────────────────────────────────────────────────────────────
+
+def features_for(level: int) -> list[str]:
+    """The UI feature flags a version switches on. Grows one phase at a time."""
+    feats: list[str] = []
+    if level >= 1:
+        feats += ["personas", "sampling", "cot", "structured", "tools_schema"]
+    if level >= 2:
+        feats += ["memory", "context"]
+    if level >= 3:
+        feats += ["embeddings", "notes"]
+    if level >= 4:
+        feats += ["rag"]
+    if level >= 5:
+        feats += ["agents"]
+    if level >= 6:
+        feats += ["mcp"]
+    if level >= 7:
+        feats += ["security"]
+    if level >= 8:
+        feats += ["evals"]
+    return feats
+
+
+def meta_endpoint(level: int) -> str:
+    banner = concept(
+        "all phases",
+        "/meta — capability manifest",
+        "Report which concepts this version has, so the UI reveals only those controls.",
+    )
+    return (
+        f"{banner}\n"
+        '@app.get("/meta")\n'
+        "def meta() -> dict:\n"
+        '    """What this version supports; the frontend gates its controls on this."""\n'
+        f'    return {{"version": "v{level}", "features": {features_for(level)!r}}}\n'
+    )
+
+
 def endpoints_for(level: int) -> list[str]:
     blocks: list[str] = []
     if level >= 1:
@@ -1026,6 +1067,7 @@ def compose(level: int) -> str:
         imports_for(level),
         'STATIC_DIR = _APP_DIR / "static"',
         f'app = FastAPI(title="Study Buddy", version="v{level}")',
+        meta_endpoint(level),
         models_block,
         ask_for(level),
         *endpoints_for(level),

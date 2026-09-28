@@ -49,6 +49,15 @@ STATIC_DIR = _APP_DIR / "static"
 
 app = FastAPI(title="Study Buddy", version="v0")
 
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · /meta — capability manifest  [all phases]
+# Report which concepts this version has, so the UI reveals only those controls.
+# ────────────────────────────────────────────────────────────────────────────
+@app.get("/meta")
+def meta() -> dict:
+    """What this version supports; the frontend gates its controls on this."""
+    return {"version": "v0", "features": []}
+
 class AskRequest(BaseModel):
     question: str
 

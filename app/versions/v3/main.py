@@ -57,6 +57,15 @@ STATIC_DIR = _APP_DIR / "static"
 app = FastAPI(title="Study Buddy", version="v3")
 
 # ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · /meta — capability manifest  [all phases]
+# Report which concepts this version has, so the UI reveals only those controls.
+# ────────────────────────────────────────────────────────────────────────────
+@app.get("/meta")
+def meta() -> dict:
+    """What this version supports; the frontend gates its controls on this."""
+    return {"version": "v3", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'embeddings', 'notes']}
+
+# ────────────────────────────────────────────────────────────────────────────
 # CONCEPT · API request / response contract  [Phase 1.4]
 # Pydantic types the request we accept and the response we return.
 # ────────────────────────────────────────────────────────────────────────────
