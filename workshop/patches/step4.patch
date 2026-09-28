@@ -1,17 +1,17 @@
 diff --git a/app/main.py b/app/main.py
-index 481be92..a9b049f 100644
+index d6379cb..3e7db4e 100644
 --- a/app/main.py
 +++ b/app/main.py
-@@ -44,7 +44,7 @@ from app.context import context_budget_warning, context_report
+@@ -54,7 +54,7 @@ from app.context import context_budget_warning, context_report
  
  STATIC_DIR = _APP_DIR / "static"
  
 -app = FastAPI(title="Study Buddy", version="v3")
 +app = FastAPI(title="Study Buddy", version="v4")
  
- class AskRequest(BaseModel):
-     question:         str
-@@ -56,11 +56,14 @@ class AskRequest(BaseModel):
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · API request / response contract  [Phase 1.4]
+@@ -71,11 +71,14 @@ class AskRequest(BaseModel):
      student_name:     str | None = None
      study_goal:       str | None = None
      compact_strategy: str        = "halve"   # "halve" | "keep_last2"
@@ -26,7 +26,7 @@ index 481be92..a9b049f 100644
      input_tokens:    int = 0
      output_tokens:   int = 0
      context_report:  dict = {}
-@@ -91,20 +94,59 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -113,21 +116,62 @@ def ask(request: AskRequest) -> AskResponse:
          study_goal=request.study_goal,
      )
  
@@ -35,7 +35,8 @@ index 481be92..a9b049f 100644
 -        messages.append({"role": "system", "content": system_content})
 -    messages += history
 -
--    # ── Phase 1.3: CoT injection ─────────────────────────────────────────────
+-    # ── CONCEPT · Chain of thought [Phase 1.3] ───────────────────────────────
+-    # Ask the model to reason step by step, tagged so we can split it out later.
 -    user_content = request.question
 -    if request.cot:
 -        user_content += (
@@ -44,7 +45,8 @@ index 481be92..a9b049f 100644
 -            "and your final answer in <answer>...</answer>."
 -        )
 -    messages.append({"role": "user", "content": user_content})
-+    # ── Phase 4+: RAG retrieval ──────────────────────────────────────────────
++    # ── CONCEPT · Retrieval [Phase 5] ────────────────────────────────────────
++    # Semantic-search the notes for the most relevant chunks; None = nothing close.
 +    grounded = False
 +    sources: list[str] = []
 +    rag_chunks: list[dict] = []
@@ -60,7 +62,8 @@ index 481be92..a9b049f 100644
 +        except Exception:  # noqa: BLE001 — RAG not set up yet is fine
 +            pass
 +
-+    # ── Build the messages list ──────────────────────────────────────────────
++    # ── CONCEPT · Grounded generation [Phase 5] ──────────────────────────────
++    # If we retrieved notes, build a prompt that answers ONLY from those chunks.
 +    if grounded and rag_chunks:
 +        from app.rag import build_rag_prompt
 +        messages = build_rag_prompt(request.question, rag_chunks)
@@ -73,7 +76,7 @@ index 481be92..a9b049f 100644
 +            messages.append({"role": "system", "content": system_content})
 +        messages += history
 +
-+        # Phase 1.3: CoT injection.
++        # CONCEPT · Chain of thought: ask for step-by-step reasoning.
 +        user_content = request.question
 +        if request.cot:
 +            user_content += (
@@ -83,7 +86,8 @@ index 481be92..a9b049f 100644
 +            )
 +        messages.append({"role": "user", "content": user_content})
 +
-+    # No relevant notes found — refuse rather than hallucinate.
++    # ── CONCEPT · Refusal [Phase 5] ──────────────────────────────────────────
++    # Notes exist but nothing matched: say "I don't know" instead of guessing.
 +    if request.enable_rag and not grounded:
 +        try:
 +            from app.vector_store import count
@@ -98,9 +102,9 @@ index 481be92..a9b049f 100644
 +        except Exception:  # noqa: BLE001
 +            pass
  
-     # ── Phase 2.1: Context accounting ────────────────────────────────────────
-     ctx_warning = context_budget_warning(messages)
-@@ -133,6 +175,8 @@ def ask(request: AskRequest) -> AskResponse:
+     # ── CONCEPT · Context window [Phase 2.1] ─────────────────────────────────
+     # Measure the tokens the prompt uses and warn before we hit the model's limit.
+@@ -157,6 +201,8 @@ def ask(request: AskRequest) -> AskResponse:
      return AskResponse(
          answer=final_answer,
          thinking=thinking,

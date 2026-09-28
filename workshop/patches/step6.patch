@@ -1,20 +1,25 @@
 diff --git a/app/main.py b/app/main.py
-index 7f975d2..7b5a913 100644
+index 3e32c51..f06fae6 100644
 --- a/app/main.py
 +++ b/app/main.py
-@@ -44,7 +44,7 @@ from app.context import context_budget_warning, context_report
+@@ -54,7 +54,7 @@ from app.context import context_budget_warning, context_report
  
  STATIC_DIR = _APP_DIR / "static"
  
 -app = FastAPI(title="Study Buddy", version="v5")
 +app = FastAPI(title="Study Buddy", version="v6")
  
- class AskRequest(BaseModel):
-     question:         str
-@@ -385,6 +385,15 @@ def agent_plan_and_execute(body: dict) -> dict:
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · API request / response contract  [Phase 1.4]
+@@ -481,6 +481,20 @@ def agent_plan_and_execute(body: dict) -> dict:
      from app.agent import plan_and_execute
      return plan_and_execute(body.get("question", ""))
  
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · MCP  [Phase 7]
++# List tools discovered from the MCP server over stdio.
++# ────────────────────────────────────────────────────────────────────────────
++
 +@app.get("/mcp/tools")
 +def mcp_tools() -> list:
 +    """List tools discovered from the Study Buddy MCP server (Phase 7)."""
@@ -24,6 +29,6 @@ index 7f975d2..7b5a913 100644
 +    except Exception as exc:  # noqa: BLE001
 +        raise HTTPException(status_code=503, detail=f"MCP server unavailable: {exc}")
 +
- @app.get("/")
- def index() -> FileResponse:
-     return FileResponse(STATIC_DIR / "index.html")
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · Frontend  [all phases]
+ # Serve the single-page UI; every phase of the workshop is driven through it.

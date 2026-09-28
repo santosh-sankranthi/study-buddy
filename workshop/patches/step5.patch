@@ -1,20 +1,25 @@
 diff --git a/app/main.py b/app/main.py
-index a9b049f..7f975d2 100644
+index 3e7db4e..3e32c51 100644
 --- a/app/main.py
 +++ b/app/main.py
-@@ -44,7 +44,7 @@ from app.context import context_budget_warning, context_report
+@@ -54,7 +54,7 @@ from app.context import context_budget_warning, context_report
  
  STATIC_DIR = _APP_DIR / "static"
  
 -app = FastAPI(title="Study Buddy", version="v4")
 +app = FastAPI(title="Study Buddy", version="v5")
  
- class AskRequest(BaseModel):
-     question:         str
-@@ -374,6 +374,17 @@ def search_notes_endpoint(body: dict) -> list:
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · API request / response contract  [Phase 1.4]
+@@ -465,6 +465,22 @@ def search_notes_endpoint(body: dict) -> list:
      from app.vector_store import search
      return search(body.get("query", ""), k=int(body.get("k", 3)), subject=body.get("subject"))
  
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Agents  [Phase 6]
++# A ReAct loop that calls tools, plus a planner->executor->critic pipeline.
++# ────────────────────────────────────────────────────────────────────────────
++
 +@app.post("/agent/ask")
 +def agent_ask(body: dict) -> dict:
 +    from app.agent import agent_loop
@@ -26,6 +31,6 @@ index a9b049f..7f975d2 100644
 +    from app.agent import plan_and_execute
 +    return plan_and_execute(body.get("question", ""))
 +
- @app.get("/")
- def index() -> FileResponse:
-     return FileResponse(STATIC_DIR / "index.html")
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · Frontend  [all phases]
+ # Serve the single-page UI; every phase of the workshop is driven through it.

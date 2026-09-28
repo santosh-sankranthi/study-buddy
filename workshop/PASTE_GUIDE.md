@@ -38,10 +38,10 @@ Each step below shows the **exact diff** of `app/main.py`. Type the `+` lines in
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index c2e32a8..b8e6690 100644
+index 6b59ec5..72ca7ac 100644
 --- a/app/main.py
 +++ b/app/main.py
-@@ -18,6 +18,7 @@ Phase progression:
+@@ -28,6 +28,7 @@ How to read this file
  from __future__ import annotations
  
  import sys
@@ -49,7 +49,7 @@ index c2e32a8..b8e6690 100644
  from pathlib import Path
  
  # Locate the app package by walking up from this file, so this module works
-@@ -27,33 +28,164 @@ while _APP_DIR.name != "app" and _APP_DIR.parent != _APP_DIR:
+@@ -37,24 +38,39 @@ while _APP_DIR.name != "app" and _APP_DIR.parent != _APP_DIR:
      _APP_DIR = _APP_DIR.parent
  sys.path.insert(0, str(_APP_DIR.parent))
  
@@ -70,6 +70,11 @@ index c2e32a8..b8e6690 100644
  
 -app = FastAPI(title="Study Buddy", version="v0")
 +app = FastAPI(title="Study Buddy", version="v1")
++
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · API request / response contract  [Phase 1.4]
++# Pydantic types the request we accept and the response we return.
++# ────────────────────────────────────────────────────────────────────────────
  
  class AskRequest(BaseModel):
 -    question: str
@@ -87,6 +92,10 @@ index c2e32a8..b8e6690 100644
 +    input_tokens:  int = 0
 +    output_tokens: int = 0
  
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · /ask — the core endpoint  [Phase 0-9]
+@@ -63,12 +79,158 @@ class AskResponse(BaseModel):
+ 
  @app.post("/ask", response_model=AskResponse)
  def ask(request: AskRequest) -> AskResponse:
 -    """Raw one-shot forward pass: no persona, no memory, no grounding."""
@@ -100,7 +109,7 @@ index c2e32a8..b8e6690 100644
 +    if system_content:
 +        messages.append({"role": "system", "content": system_content})
 +
-+    # Phase 1.3: CoT injection.
++    # CONCEPT · Chain of thought: ask for step-by-step reasoning.
 +    user_content = request.question
 +    if request.cot:
 +        user_content += (
@@ -130,9 +139,19 @@ index c2e32a8..b8e6690 100644
      )
 -    return AskResponse(answer=raw)
 +
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Personas / modes  [Phase 1.1]
++# List the tutor personas the frontend can choose from.
++# ────────────────────────────────────────────────────────────────────────────
++
 +@app.get("/modes")
 +def list_modes() -> list[str]:
 +    return ["tutor", "direct", "flashcard"]
++
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Few-shot  [Phase 1.2]
++# Two worked Q&A -> MCQ examples fix the JSON shape of /quiz-item.
++# ────────────────────────────────────────────────────────────────────────────
 +
 +QUIZ_EXAMPLES = [
 +    {
@@ -171,6 +190,11 @@ index c2e32a8..b8e6690 100644
 +
 +    return item.model_dump()
 +
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Structured output  [Phase 1.4]
++# Pydantic validates the model's JSON, or raises ValidationError.
++# ────────────────────────────────────────────────────────────────────────────
++
 +@app.post("/flashcards")
 +def make_flashcards(body: dict) -> dict:
 +    topic = body.get("topic", "")
@@ -187,6 +211,11 @@ index c2e32a8..b8e6690 100644
 +    raw  = chat(messages, temperature=0.3)
 +    card = Flashcard.model_validate_json(raw)
 +    return card.model_dump()
++
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Structured output (a list)  [Phase 1.4]
++# A multi-day plan validated against StudyPlanDay and a time budget.
++# ────────────────────────────────────────────────────────────────────────────
 +
 +@app.post("/study-plan")
 +def make_study_plan(body: dict) -> list:
@@ -218,12 +247,17 @@ index c2e32a8..b8e6690 100644
 +        )
 +    return [d.model_dump() for d in plan]
 +
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Function calling (schemas)  [Phase 1.5]
++# Publish the JSON tool contracts; nothing is executed yet.
++# ────────────────────────────────────────────────────────────────────────────
++
 +@app.get("/tools")
 +def list_tools() -> list:
 +    return TOOLS
  
- @app.get("/")
- def index() -> FileResponse:
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · Frontend  [all phases]
 ```
 
 
@@ -255,10 +289,10 @@ index c2e32a8..b8e6690 100644
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index b8e6690..7210b63 100644
+index 72ca7ac..e914895 100644
 --- a/app/main.py
 +++ b/app/main.py
-@@ -19,6 +19,8 @@ from __future__ import annotations
+@@ -29,6 +29,8 @@ from __future__ import annotations
  
  import sys
  import re
@@ -267,7 +301,7 @@ index b8e6690..7210b63 100644
  from pathlib import Path
  
  # Locate the app package by walking up from this file, so this module works
-@@ -38,35 +40,63 @@ from common.tokens import count_tokens
+@@ -48,10 +50,11 @@ from common.tokens import count_tokens
  from app.prompts import build_few_shot_prompt, build_system
  from app.schemas import Flashcard, QuizItem, StudyPlanDay
  from app.tools import TOOLS
@@ -277,6 +311,11 @@ index b8e6690..7210b63 100644
  
 -app = FastAPI(title="Study Buddy", version="v1")
 +app = FastAPI(title="Study Buddy", version="v2")
+ 
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · API request / response contract  [Phase 1.4]
+@@ -59,18 +62,25 @@ app = FastAPI(title="Study Buddy", version="v1")
+ # ────────────────────────────────────────────────────────────────────────────
  
  class AskRequest(BaseModel):
 -    question:    str
@@ -308,12 +347,16 @@ index b8e6690..7210b63 100644
 +    context_warning: str | None = None
 +    compacted:       bool = False
  
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · /ask — the core endpoint  [Phase 0-9]
+@@ -80,13 +90,36 @@ class AskResponse(BaseModel):
  @app.post("/ask", response_model=AskResponse)
  def ask(request: AskRequest) -> AskResponse:
      """Send a question to Study Buddy. Behaviour grows phase by phase."""
 -    system_content = build_system(mode=request.mode)
 +
-+    # ── Phase 2.2: Memory — compact, then load session history ───────────────
++    # ── CONCEPT · Memory [Phase 2.2] ─────────────────────────────────────────
++    # Reload earlier turns so the tutor remembers. Compaction shrinks long history.
 +    compacted = False
 +    history: list[dict] = []
 +    if request.session_id:
@@ -326,7 +369,8 @@ index b8e6690..7210b63 100644
 +            compacted = compact_if_needed(request.session_id)
 +        history = get_history(request.session_id)
 +
-+    # ── Phase 1.1: System prompt ─────────────────────────────────────────────
++    # ── CONCEPT · System prompt [Phase 1.1] ──────────────────────────────────
++    # Prepend a `system` message: who the tutor is and the rules it must follow.
 +    system_content = build_system(
 +        mode=request.mode,
 +        student_name=request.student_name,
@@ -338,31 +382,33 @@ index b8e6690..7210b63 100644
          messages.append({"role": "system", "content": system_content})
 +    messages += history
  
--    # Phase 1.3: CoT injection.
-+    # ── Phase 1.3: CoT injection ─────────────────────────────────────────────
+-    # CONCEPT · Chain of thought: ask for step-by-step reasoning.
++    # ── CONCEPT · Chain of thought [Phase 1.3] ───────────────────────────────
++    # Ask the model to reason step by step, tagged so we can split it out later.
      user_content = request.question
      if request.cot:
          user_content += (
-@@ -76,8 +106,14 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -96,8 +129,15 @@ def ask(request: AskRequest) -> AskResponse:
          )
      messages.append({"role": "user", "content": user_content})
  
-+    # ── Phase 2.1: Context accounting ────────────────────────────────────────
++    # ── CONCEPT · Context window [Phase 2.1] ─────────────────────────────────
++    # Measure the tokens the prompt uses and warn before we hit the model's limit.
 +    ctx_warning = context_budget_warning(messages)
 +    ctx_report  = context_report(messages)
 +
-+    # ── Call the LLM ─────────────────────────────────────────────────────────
++    # ── The model call itself (the one thing v0 already did) ─────────────────
      raw_answer = chat(messages, temperature=request.temperature, top_p=request.top_p)
  
-+    # ── Phase 1.3: Parse CoT tags ────────────────────────────────────────────
++    # ── CONCEPT · Chain of thought — separate reasoning from the answer ──────
      thinking: str | None = None
      final_answer = raw_answer
      if request.cot:
-@@ -88,11 +124,20 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -108,11 +148,20 @@ def ask(request: AskRequest) -> AskResponse:
          if a_match:
              final_answer = a_match.group(1).strip()
  
-+    # ── Phase 2.2: Save to memory ────────────────────────────────────────────
++    # ── CONCEPT · Memory — store this turn so the next one remembers it ──────
 +    if request.session_id:
 +        append(request.session_id, "user", request.question)
 +        append(request.session_id, "assistant", final_answer)
@@ -379,11 +425,16 @@ index b8e6690..7210b63 100644
 +        compacted=compacted,
      )
  
- @app.get("/modes")
-@@ -187,6 +232,55 @@ def make_study_plan(body: dict) -> list:
+ # ────────────────────────────────────────────────────────────────────────────
+@@ -232,6 +281,70 @@ def make_study_plan(body: dict) -> list:
  def list_tools() -> list:
      return TOOLS
  
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Context sources  [Phase 2.1]
++# Show where the prompt's tokens go, broken down by role.
++# ────────────────────────────────────────────────────────────────────────────
++
 +@app.get("/context-report")
 +def get_context_report(session_id: str | None = None) -> dict:
 +    messages: list[dict] = []
@@ -391,6 +442,11 @@ index b8e6690..7210b63 100644
 +        from app.memory import get_history
 +        messages = get_history(session_id)
 +    return context_report(messages)
++
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Memory (API)  [Phase 2.2]
++# Read or clear a session's stored conversation.
++# ────────────────────────────────────────────────────────────────────────────
 +
 +@app.get("/session/{session_id}/history")
 +def get_session_history(session_id: str) -> list:
@@ -403,6 +459,11 @@ index b8e6690..7210b63 100644
 +    from app.memory import clear
 +    clear(session_id)
 +    return {"cleared": True, "session_id": session_id}
++
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Long context  [Phase 2.4]
++# Measure latency and cost as the pasted document grows.
++# ────────────────────────────────────────────────────────────────────────────
 +
 +@app.post("/measure-long-context")
 +def measure_long_context(body: dict) -> list:
@@ -433,9 +494,9 @@ index b8e6690..7210b63 100644
 +        })
 +    return results
 +
- @app.get("/")
- def index() -> FileResponse:
-     return FileResponse(STATIC_DIR / "index.html")
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · Frontend  [all phases]
+ # Serve the single-page UI; every phase of the workshop is driven through it.
 ```
 
 
@@ -467,27 +528,37 @@ index b8e6690..7210b63 100644
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index 7210b63..481be92 100644
+index e914895..d6379cb 100644
 --- a/app/main.py
 +++ b/app/main.py
-@@ -44,7 +44,7 @@ from app.context import context_budget_warning, context_report
+@@ -54,7 +54,7 @@ from app.context import context_budget_warning, context_report
  
  STATIC_DIR = _APP_DIR / "static"
  
 -app = FastAPI(title="Study Buddy", version="v2")
 +app = FastAPI(title="Study Buddy", version="v3")
  
- class AskRequest(BaseModel):
-     question:         str
-@@ -281,6 +281,55 @@ def measure_long_context(body: dict) -> list:
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · API request / response contract  [Phase 1.4]
+@@ -345,6 +345,80 @@ def measure_long_context(body: dict) -> list:
          })
      return results
  
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Embeddings  [Phase 3.2]
++# Turn text into a vector; return its size and a preview.
++# ────────────────────────────────────────────────────────────────────────────
++
 +@app.post("/embed")
 +def embed_endpoint(body: dict) -> dict:
 +    from app.embeddings import embed
 +    vec = embed(body.get("text", ""))
 +    return {"dimensions": len(vec), "preview": vec[:10], "vector": vec}
++
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Vector representations  [Phase 3.1]
++# Rank toy vectors by cosine similarity -- the idea, by hand.
++# ────────────────────────────────────────────────────────────────────────────
 +
 +@app.get("/similarity-demo")
 +def similarity_demo() -> list:
@@ -496,10 +567,20 @@ index 7210b63..481be92 100644
 +    ranked = rank_by_similarity(query_vec, DEMO_VECS)
 +    return [{"text": t, "score": round(s, 4)} for t, s in ranked]
 +
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Semantic search  [Phase 3.3]
++# Rank documents by meaning, not by exact words.
++# ────────────────────────────────────────────────────────────────────────────
++
 +@app.post("/semantic-search")
 +def semantic_search_endpoint(body: dict) -> list:
 +    from app.search import semantic_search
 +    return semantic_search(body.get("query", ""), body.get("docs", []), int(body.get("k", 3)))
++
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Indexing  [Phase 4.1]
++# Chunk notes and store their vectors in ChromaDB.
++# ────────────────────────────────────────────────────────────────────────────
 +
 +@app.post("/notes/upload")
 +def upload_note(body: dict) -> dict:
@@ -527,14 +608,19 @@ index 7210b63..481be92 100644
 +        "total_docs":     count(),
 +    }
 +
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Similarity search  [Phase 4.2]
++# Query the vector store, optionally filtered by subject.
++# ────────────────────────────────────────────────────────────────────────────
++
 +@app.post("/notes/search")
 +def search_notes_endpoint(body: dict) -> list:
 +    from app.vector_store import search
 +    return search(body.get("query", ""), k=int(body.get("k", 3)), subject=body.get("subject"))
 +
- @app.get("/")
- def index() -> FileResponse:
-     return FileResponse(STATIC_DIR / "index.html")
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · Frontend  [all phases]
+ # Serve the single-page UI; every phase of the workshop is driven through it.
 ```
 
 
@@ -562,19 +648,19 @@ index 7210b63..481be92 100644
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index 481be92..a9b049f 100644
+index d6379cb..3e7db4e 100644
 --- a/app/main.py
 +++ b/app/main.py
-@@ -44,7 +44,7 @@ from app.context import context_budget_warning, context_report
+@@ -54,7 +54,7 @@ from app.context import context_budget_warning, context_report
  
  STATIC_DIR = _APP_DIR / "static"
  
 -app = FastAPI(title="Study Buddy", version="v3")
 +app = FastAPI(title="Study Buddy", version="v4")
  
- class AskRequest(BaseModel):
-     question:         str
-@@ -56,11 +56,14 @@ class AskRequest(BaseModel):
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · API request / response contract  [Phase 1.4]
+@@ -71,11 +71,14 @@ class AskRequest(BaseModel):
      student_name:     str | None = None
      study_goal:       str | None = None
      compact_strategy: str        = "halve"   # "halve" | "keep_last2"
@@ -589,7 +675,7 @@ index 481be92..a9b049f 100644
      input_tokens:    int = 0
      output_tokens:   int = 0
      context_report:  dict = {}
-@@ -91,20 +94,59 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -113,21 +116,62 @@ def ask(request: AskRequest) -> AskResponse:
          study_goal=request.study_goal,
      )
  
@@ -598,7 +684,8 @@ index 481be92..a9b049f 100644
 -        messages.append({"role": "system", "content": system_content})
 -    messages += history
 -
--    # ── Phase 1.3: CoT injection ─────────────────────────────────────────────
+-    # ── CONCEPT · Chain of thought [Phase 1.3] ───────────────────────────────
+-    # Ask the model to reason step by step, tagged so we can split it out later.
 -    user_content = request.question
 -    if request.cot:
 -        user_content += (
@@ -607,7 +694,8 @@ index 481be92..a9b049f 100644
 -            "and your final answer in <answer>...</answer>."
 -        )
 -    messages.append({"role": "user", "content": user_content})
-+    # ── Phase 4+: RAG retrieval ──────────────────────────────────────────────
++    # ── CONCEPT · Retrieval [Phase 5] ────────────────────────────────────────
++    # Semantic-search the notes for the most relevant chunks; None = nothing close.
 +    grounded = False
 +    sources: list[str] = []
 +    rag_chunks: list[dict] = []
@@ -623,7 +711,8 @@ index 481be92..a9b049f 100644
 +        except Exception:  # noqa: BLE001 — RAG not set up yet is fine
 +            pass
 +
-+    # ── Build the messages list ──────────────────────────────────────────────
++    # ── CONCEPT · Grounded generation [Phase 5] ──────────────────────────────
++    # If we retrieved notes, build a prompt that answers ONLY from those chunks.
 +    if grounded and rag_chunks:
 +        from app.rag import build_rag_prompt
 +        messages = build_rag_prompt(request.question, rag_chunks)
@@ -636,7 +725,7 @@ index 481be92..a9b049f 100644
 +            messages.append({"role": "system", "content": system_content})
 +        messages += history
 +
-+        # Phase 1.3: CoT injection.
++        # CONCEPT · Chain of thought: ask for step-by-step reasoning.
 +        user_content = request.question
 +        if request.cot:
 +            user_content += (
@@ -646,7 +735,8 @@ index 481be92..a9b049f 100644
 +            )
 +        messages.append({"role": "user", "content": user_content})
 +
-+    # No relevant notes found — refuse rather than hallucinate.
++    # ── CONCEPT · Refusal [Phase 5] ──────────────────────────────────────────
++    # Notes exist but nothing matched: say "I don't know" instead of guessing.
 +    if request.enable_rag and not grounded:
 +        try:
 +            from app.vector_store import count
@@ -661,9 +751,9 @@ index 481be92..a9b049f 100644
 +        except Exception:  # noqa: BLE001
 +            pass
  
-     # ── Phase 2.1: Context accounting ────────────────────────────────────────
-     ctx_warning = context_budget_warning(messages)
-@@ -133,6 +175,8 @@ def ask(request: AskRequest) -> AskResponse:
+     # ── CONCEPT · Context window [Phase 2.1] ─────────────────────────────────
+     # Measure the tokens the prompt uses and warn before we hit the model's limit.
+@@ -157,6 +201,8 @@ def ask(request: AskRequest) -> AskResponse:
      return AskResponse(
          answer=final_answer,
          thinking=thinking,
@@ -701,22 +791,27 @@ index 481be92..a9b049f 100644
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index a9b049f..7f975d2 100644
+index 3e7db4e..3e32c51 100644
 --- a/app/main.py
 +++ b/app/main.py
-@@ -44,7 +44,7 @@ from app.context import context_budget_warning, context_report
+@@ -54,7 +54,7 @@ from app.context import context_budget_warning, context_report
  
  STATIC_DIR = _APP_DIR / "static"
  
 -app = FastAPI(title="Study Buddy", version="v4")
 +app = FastAPI(title="Study Buddy", version="v5")
  
- class AskRequest(BaseModel):
-     question:         str
-@@ -374,6 +374,17 @@ def search_notes_endpoint(body: dict) -> list:
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · API request / response contract  [Phase 1.4]
+@@ -465,6 +465,22 @@ def search_notes_endpoint(body: dict) -> list:
      from app.vector_store import search
      return search(body.get("query", ""), k=int(body.get("k", 3)), subject=body.get("subject"))
  
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Agents  [Phase 6]
++# A ReAct loop that calls tools, plus a planner->executor->critic pipeline.
++# ────────────────────────────────────────────────────────────────────────────
++
 +@app.post("/agent/ask")
 +def agent_ask(body: dict) -> dict:
 +    from app.agent import agent_loop
@@ -728,9 +823,9 @@ index a9b049f..7f975d2 100644
 +    from app.agent import plan_and_execute
 +    return plan_and_execute(body.get("question", ""))
 +
- @app.get("/")
- def index() -> FileResponse:
-     return FileResponse(STATIC_DIR / "index.html")
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · Frontend  [all phases]
+ # Serve the single-page UI; every phase of the workshop is driven through it.
 ```
 
 
@@ -756,22 +851,27 @@ index a9b049f..7f975d2 100644
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index 7f975d2..7b5a913 100644
+index 3e32c51..f06fae6 100644
 --- a/app/main.py
 +++ b/app/main.py
-@@ -44,7 +44,7 @@ from app.context import context_budget_warning, context_report
+@@ -54,7 +54,7 @@ from app.context import context_budget_warning, context_report
  
  STATIC_DIR = _APP_DIR / "static"
  
 -app = FastAPI(title="Study Buddy", version="v5")
 +app = FastAPI(title="Study Buddy", version="v6")
  
- class AskRequest(BaseModel):
-     question:         str
-@@ -385,6 +385,15 @@ def agent_plan_and_execute(body: dict) -> dict:
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · API request / response contract  [Phase 1.4]
+@@ -481,6 +481,20 @@ def agent_plan_and_execute(body: dict) -> dict:
      from app.agent import plan_and_execute
      return plan_and_execute(body.get("question", ""))
  
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · MCP  [Phase 7]
++# List tools discovered from the MCP server over stdio.
++# ────────────────────────────────────────────────────────────────────────────
++
 +@app.get("/mcp/tools")
 +def mcp_tools() -> list:
 +    """List tools discovered from the Study Buddy MCP server (Phase 7)."""
@@ -781,9 +881,9 @@ index 7f975d2..7b5a913 100644
 +    except Exception as exc:  # noqa: BLE001
 +        raise HTTPException(status_code=503, detail=f"MCP server unavailable: {exc}")
 +
- @app.get("/")
- def index() -> FileResponse:
-     return FileResponse(STATIC_DIR / "index.html")
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · Frontend  [all phases]
+ # Serve the single-page UI; every phase of the workshop is driven through it.
 ```
 
 
@@ -811,10 +911,10 @@ index 7f975d2..7b5a913 100644
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index 7b5a913..a05fe65 100644
+index f06fae6..824af8a 100644
 --- a/app/main.py
 +++ b/app/main.py
-@@ -41,10 +41,11 @@ from app.prompts import build_few_shot_prompt, build_system
+@@ -51,10 +51,11 @@ from app.prompts import build_few_shot_prompt, build_system
  from app.schemas import Flashcard, QuizItem, StudyPlanDay
  from app.tools import TOOLS
  from app.context import context_budget_warning, context_report
@@ -825,9 +925,9 @@ index 7b5a913..a05fe65 100644
 -app = FastAPI(title="Study Buddy", version="v6")
 +app = FastAPI(title="Study Buddy", version="v7")
  
- class AskRequest(BaseModel):
-     question:         str
-@@ -57,23 +58,45 @@ class AskRequest(BaseModel):
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · API request / response contract  [Phase 1.4]
+@@ -72,18 +73,22 @@ class AskRequest(BaseModel):
      study_goal:       str | None = None
      compact_strategy: str        = "halve"   # "halve" | "keep_last2"
      enable_rag:       bool       = True      # Phase 4+
@@ -857,11 +957,14 @@ index 7b5a913..a05fe65 100644
 +    pii_types:          list[str] = []
 +    compacted:          bool = False
  
- @app.post("/ask", response_model=AskResponse)
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · /ask — the core endpoint  [Phase 0-9]
+@@ -94,6 +99,25 @@ class AskResponse(BaseModel):
  def ask(request: AskRequest) -> AskResponse:
      """Send a question to Study Buddy. Behaviour grows phase by phase."""
  
-+    # ── Phase 7: Security — sanitize input ──────────────────────────────────
++    # ── CONCEPT · Prompt injection + PII [Phase 8] ───────────────────────────
++    # Strip injected instructions and redact personal data before anything runs.
 +    question           = request.question
 +    injection_detected = False
 +    pii_detected       = False
@@ -879,10 +982,10 @@ index 7b5a913..a05fe65 100644
 +                detail=f"Request blocked by content policy. Categories: {input_mod.get('categories', {})}",
 +            )
 +
-     # ── Phase 2.2: Memory — compact, then load session history ───────────────
+     # ── CONCEPT · Memory [Phase 2.2] ─────────────────────────────────────────
+     # Reload earlier turns so the tutor remembers. Compaction shrinks long history.
      compacted = False
-     history: list[dict] = []
-@@ -102,7 +125,7 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -125,7 +149,7 @@ def ask(request: AskRequest) -> AskResponse:
          try:
              from app.vector_store import retrieve
              from app.rag import extract_sources
@@ -891,8 +994,8 @@ index 7b5a913..a05fe65 100644
              if chunks:
                  rag_chunks = chunks
                  sources    = extract_sources(chunks)
-@@ -113,7 +136,7 @@ def ask(request: AskRequest) -> AskResponse:
-     # ── Build the messages list ──────────────────────────────────────────────
+@@ -137,7 +161,7 @@ def ask(request: AskRequest) -> AskResponse:
+     # If we retrieved notes, build a prompt that answers ONLY from those chunks.
      if grounded and rag_chunks:
          from app.rag import build_rag_prompt
 -        messages = build_rag_prompt(request.question, rag_chunks)
@@ -900,16 +1003,16 @@ index 7b5a913..a05fe65 100644
          # Prepend history before the RAG user message.
          if history:
              messages = [messages[0]] + history + [messages[1]]
-@@ -124,7 +147,7 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -148,7 +172,7 @@ def ask(request: AskRequest) -> AskResponse:
          messages += history
  
-         # Phase 1.3: CoT injection.
+         # CONCEPT · Chain of thought: ask for step-by-step reasoning.
 -        user_content = request.question
 +        user_content = question
          if request.cot:
              user_content += (
                  "\n\nThink step by step before answering. "
-@@ -141,8 +164,11 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -166,8 +190,11 @@ def ask(request: AskRequest) -> AskResponse:
                  return AskResponse(
                      answer="I don't have enough information in your notes to answer this.",
                      grounded=False,
@@ -922,29 +1025,29 @@ index 7b5a913..a05fe65 100644
                      compacted=compacted,
                  )
          except Exception:  # noqa: BLE001
-@@ -155,6 +181,12 @@ def ask(request: AskRequest) -> AskResponse:
-     # ── Call the LLM ─────────────────────────────────────────────────────────
+@@ -181,6 +208,12 @@ def ask(request: AskRequest) -> AskResponse:
+     # ── The model call itself (the one thing v0 already did) ─────────────────
      raw_answer = chat(messages, temperature=request.temperature, top_p=request.top_p)
  
-+    # ── Phase 7: Moderate output ─────────────────────────────────────────────
++    # ── CONCEPT · Moderation [Phase 8] — check the model's output too ────────
 +    if request.enable_security:
 +        out_mod = moderate(raw_answer)
 +        if out_mod.get("flagged"):
 +            raw_answer = "[Response blocked by content policy.]"
 +
-     # ── Phase 1.3: Parse CoT tags ────────────────────────────────────────────
+     # ── CONCEPT · Chain of thought — separate reasoning from the answer ──────
      thinking: str | None = None
      final_answer = raw_answer
-@@ -168,7 +200,7 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -194,7 +227,7 @@ def ask(request: AskRequest) -> AskResponse:
  
-     # ── Phase 2.2: Save to memory ────────────────────────────────────────────
+     # ── CONCEPT · Memory — store this turn so the next one remembers it ──────
      if request.session_id:
 -        append(request.session_id, "user", request.question)
 +        append(request.session_id, "user", question)
          append(request.session_id, "assistant", final_answer)
  
      input_tokens = count_tokens(" ".join(m.get("content") or "" for m in messages))
-@@ -181,6 +213,9 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -207,6 +240,9 @@ def ask(request: AskRequest) -> AskResponse:
          output_tokens=count_tokens(final_answer),
          context_report=ctx_report,
          context_warning=ctx_warning,
@@ -979,10 +1082,10 @@ index 7b5a913..a05fe65 100644
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index a05fe65..9a2f2c8 100644
+index 824af8a..db824de 100644
 --- a/app/main.py
 +++ b/app/main.py
-@@ -21,6 +21,7 @@ import sys
+@@ -31,6 +31,7 @@ import sys
  import re
  import time
  import urllib.request
@@ -990,19 +1093,24 @@ index a05fe65..9a2f2c8 100644
  from pathlib import Path
  
  # Locate the app package by walking up from this file, so this module works
-@@ -45,7 +46,7 @@ from app.security import moderate, sanitize_input, scrub_pii
+@@ -55,7 +56,7 @@ from app.security import moderate, sanitize_input, scrub_pii
  
  STATIC_DIR = _APP_DIR / "static"
  
 -app = FastAPI(title="Study Buddy", version="v7")
 +app = FastAPI(title="Study Buddy", version="v8")
  
- class AskRequest(BaseModel):
-     question:         str
-@@ -429,6 +430,60 @@ def mcp_tools() -> list:
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · API request / response contract  [Phase 1.4]
+@@ -531,6 +532,70 @@ def mcp_tools() -> list:
      except Exception as exc:  # noqa: BLE001
          raise HTTPException(status_code=503, detail=f"MCP server unavailable: {exc}")
  
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Observability  [Phase 9.5]
++# Pass rate over logged groundedness checks.
++# ────────────────────────────────────────────────────────────────────────────
++
 +@app.get("/eval/groundedness-report")
 +def groundedness_report() -> dict:
 +    log_path = Path("./data/groundedness_log.jsonl")
@@ -1015,6 +1123,11 @@ index a05fe65..9a2f2c8 100644
 +        "passed":    passed,
 +        "pass_rate": round(passed / len(lines), 3) if lines else 0.0,
 +    }
++
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Regression testing  [Phase 9.4]
++# Run a built-in eval set against the running app.
++# ────────────────────────────────────────────────────────────────────────────
 +
 +EVAL_SET = [
 +    {"question": "What is photosynthesis?",              "check": lambda r: "light" in r.lower() or "energy" in r.lower()},
@@ -1057,9 +1170,9 @@ index a05fe65..9a2f2c8 100644
 +        "details":   results,
 +    }
 +
- @app.get("/")
- def index() -> FileResponse:
-     return FileResponse(STATIC_DIR / "index.html")
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · Frontend  [all phases]
+ # Serve the single-page UI; every phase of the workshop is driven through it.
 ```
 
 

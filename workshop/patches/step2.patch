@@ -1,8 +1,8 @@
 diff --git a/app/main.py b/app/main.py
-index b8e6690..7210b63 100644
+index 72ca7ac..e914895 100644
 --- a/app/main.py
 +++ b/app/main.py
-@@ -19,6 +19,8 @@ from __future__ import annotations
+@@ -29,6 +29,8 @@ from __future__ import annotations
  
  import sys
  import re
@@ -11,7 +11,7 @@ index b8e6690..7210b63 100644
  from pathlib import Path
  
  # Locate the app package by walking up from this file, so this module works
-@@ -38,35 +40,63 @@ from common.tokens import count_tokens
+@@ -48,10 +50,11 @@ from common.tokens import count_tokens
  from app.prompts import build_few_shot_prompt, build_system
  from app.schemas import Flashcard, QuizItem, StudyPlanDay
  from app.tools import TOOLS
@@ -21,6 +21,11 @@ index b8e6690..7210b63 100644
  
 -app = FastAPI(title="Study Buddy", version="v1")
 +app = FastAPI(title="Study Buddy", version="v2")
+ 
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · API request / response contract  [Phase 1.4]
+@@ -59,18 +62,25 @@ app = FastAPI(title="Study Buddy", version="v1")
+ # ────────────────────────────────────────────────────────────────────────────
  
  class AskRequest(BaseModel):
 -    question:    str
@@ -52,12 +57,16 @@ index b8e6690..7210b63 100644
 +    context_warning: str | None = None
 +    compacted:       bool = False
  
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · /ask — the core endpoint  [Phase 0-9]
+@@ -80,13 +90,36 @@ class AskResponse(BaseModel):
  @app.post("/ask", response_model=AskResponse)
  def ask(request: AskRequest) -> AskResponse:
      """Send a question to Study Buddy. Behaviour grows phase by phase."""
 -    system_content = build_system(mode=request.mode)
 +
-+    # ── Phase 2.2: Memory — compact, then load session history ───────────────
++    # ── CONCEPT · Memory [Phase 2.2] ─────────────────────────────────────────
++    # Reload earlier turns so the tutor remembers. Compaction shrinks long history.
 +    compacted = False
 +    history: list[dict] = []
 +    if request.session_id:
@@ -70,7 +79,8 @@ index b8e6690..7210b63 100644
 +            compacted = compact_if_needed(request.session_id)
 +        history = get_history(request.session_id)
 +
-+    # ── Phase 1.1: System prompt ─────────────────────────────────────────────
++    # ── CONCEPT · System prompt [Phase 1.1] ──────────────────────────────────
++    # Prepend a `system` message: who the tutor is and the rules it must follow.
 +    system_content = build_system(
 +        mode=request.mode,
 +        student_name=request.student_name,
@@ -82,31 +92,33 @@ index b8e6690..7210b63 100644
          messages.append({"role": "system", "content": system_content})
 +    messages += history
  
--    # Phase 1.3: CoT injection.
-+    # ── Phase 1.3: CoT injection ─────────────────────────────────────────────
+-    # CONCEPT · Chain of thought: ask for step-by-step reasoning.
++    # ── CONCEPT · Chain of thought [Phase 1.3] ───────────────────────────────
++    # Ask the model to reason step by step, tagged so we can split it out later.
      user_content = request.question
      if request.cot:
          user_content += (
-@@ -76,8 +106,14 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -96,8 +129,15 @@ def ask(request: AskRequest) -> AskResponse:
          )
      messages.append({"role": "user", "content": user_content})
  
-+    # ── Phase 2.1: Context accounting ────────────────────────────────────────
++    # ── CONCEPT · Context window [Phase 2.1] ─────────────────────────────────
++    # Measure the tokens the prompt uses and warn before we hit the model's limit.
 +    ctx_warning = context_budget_warning(messages)
 +    ctx_report  = context_report(messages)
 +
-+    # ── Call the LLM ─────────────────────────────────────────────────────────
++    # ── The model call itself (the one thing v0 already did) ─────────────────
      raw_answer = chat(messages, temperature=request.temperature, top_p=request.top_p)
  
-+    # ── Phase 1.3: Parse CoT tags ────────────────────────────────────────────
++    # ── CONCEPT · Chain of thought — separate reasoning from the answer ──────
      thinking: str | None = None
      final_answer = raw_answer
      if request.cot:
-@@ -88,11 +124,20 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -108,11 +148,20 @@ def ask(request: AskRequest) -> AskResponse:
          if a_match:
              final_answer = a_match.group(1).strip()
  
-+    # ── Phase 2.2: Save to memory ────────────────────────────────────────────
++    # ── CONCEPT · Memory — store this turn so the next one remembers it ──────
 +    if request.session_id:
 +        append(request.session_id, "user", request.question)
 +        append(request.session_id, "assistant", final_answer)
@@ -123,11 +135,16 @@ index b8e6690..7210b63 100644
 +        compacted=compacted,
      )
  
- @app.get("/modes")
-@@ -187,6 +232,55 @@ def make_study_plan(body: dict) -> list:
+ # ────────────────────────────────────────────────────────────────────────────
+@@ -232,6 +281,70 @@ def make_study_plan(body: dict) -> list:
  def list_tools() -> list:
      return TOOLS
  
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Context sources  [Phase 2.1]
++# Show where the prompt's tokens go, broken down by role.
++# ────────────────────────────────────────────────────────────────────────────
++
 +@app.get("/context-report")
 +def get_context_report(session_id: str | None = None) -> dict:
 +    messages: list[dict] = []
@@ -135,6 +152,11 @@ index b8e6690..7210b63 100644
 +        from app.memory import get_history
 +        messages = get_history(session_id)
 +    return context_report(messages)
++
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Memory (API)  [Phase 2.2]
++# Read or clear a session's stored conversation.
++# ────────────────────────────────────────────────────────────────────────────
 +
 +@app.get("/session/{session_id}/history")
 +def get_session_history(session_id: str) -> list:
@@ -147,6 +169,11 @@ index b8e6690..7210b63 100644
 +    from app.memory import clear
 +    clear(session_id)
 +    return {"cleared": True, "session_id": session_id}
++
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Long context  [Phase 2.4]
++# Measure latency and cost as the pasted document grows.
++# ────────────────────────────────────────────────────────────────────────────
 +
 +@app.post("/measure-long-context")
 +def measure_long_context(body: dict) -> list:
@@ -177,6 +204,6 @@ index b8e6690..7210b63 100644
 +        })
 +    return results
 +
- @app.get("/")
- def index() -> FileResponse:
-     return FileResponse(STATIC_DIR / "index.html")
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · Frontend  [all phases]
+ # Serve the single-page UI; every phase of the workshop is driven through it.

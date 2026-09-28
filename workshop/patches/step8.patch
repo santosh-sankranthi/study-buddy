@@ -1,8 +1,8 @@
 diff --git a/app/main.py b/app/main.py
-index a05fe65..9a2f2c8 100644
+index 824af8a..db824de 100644
 --- a/app/main.py
 +++ b/app/main.py
-@@ -21,6 +21,7 @@ import sys
+@@ -31,6 +31,7 @@ import sys
  import re
  import time
  import urllib.request
@@ -10,19 +10,24 @@ index a05fe65..9a2f2c8 100644
  from pathlib import Path
  
  # Locate the app package by walking up from this file, so this module works
-@@ -45,7 +46,7 @@ from app.security import moderate, sanitize_input, scrub_pii
+@@ -55,7 +56,7 @@ from app.security import moderate, sanitize_input, scrub_pii
  
  STATIC_DIR = _APP_DIR / "static"
  
 -app = FastAPI(title="Study Buddy", version="v7")
 +app = FastAPI(title="Study Buddy", version="v8")
  
- class AskRequest(BaseModel):
-     question:         str
-@@ -429,6 +430,60 @@ def mcp_tools() -> list:
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · API request / response contract  [Phase 1.4]
+@@ -531,6 +532,70 @@ def mcp_tools() -> list:
      except Exception as exc:  # noqa: BLE001
          raise HTTPException(status_code=503, detail=f"MCP server unavailable: {exc}")
  
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Observability  [Phase 9.5]
++# Pass rate over logged groundedness checks.
++# ────────────────────────────────────────────────────────────────────────────
++
 +@app.get("/eval/groundedness-report")
 +def groundedness_report() -> dict:
 +    log_path = Path("./data/groundedness_log.jsonl")
@@ -35,6 +40,11 @@ index a05fe65..9a2f2c8 100644
 +        "passed":    passed,
 +        "pass_rate": round(passed / len(lines), 3) if lines else 0.0,
 +    }
++
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Regression testing  [Phase 9.4]
++# Run a built-in eval set against the running app.
++# ────────────────────────────────────────────────────────────────────────────
 +
 +EVAL_SET = [
 +    {"question": "What is photosynthesis?",              "check": lambda r: "light" in r.lower() or "energy" in r.lower()},
@@ -77,6 +87,6 @@ index a05fe65..9a2f2c8 100644
 +        "details":   results,
 +    }
 +
- @app.get("/")
- def index() -> FileResponse:
-     return FileResponse(STATIC_DIR / "index.html")
+ # ────────────────────────────────────────────────────────────────────────────
+ # CONCEPT · Frontend  [all phases]
+ # Serve the single-page UI; every phase of the workshop is driven through it.
