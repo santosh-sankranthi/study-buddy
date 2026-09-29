@@ -20,6 +20,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.tools import calculate_grade as _calculate_grade
 from app.tools import get_exam_schedule as _get_exam_schedule
 from app.tools import search_notes as _search_notes
+from app.tools import store_note as _store_note
+from app.tools import get_note as _get_note
+from app.tools import list_notes as _list_notes
 
 try:
     from mcp.server.fastmcp import FastMCP
@@ -51,11 +54,32 @@ if mcp_app:
         return _calculate_grade(scores, weights)
 
 
+    @mcp_app.tool()
+    def store_note(topic: str, content: str) -> str:
+        """Save a note for the student so it can be recalled in a later session."""
+        return _store_note(topic, content)
+
+
+    @mcp_app.tool()
+    def get_note(topic: str) -> str:
+        """Read back a note the student saved earlier, by topic."""
+        return _get_note(topic)
+
+
+    @mcp_app.tool()
+    def list_notes() -> str:
+        """List all notes the student has saved so far."""
+        return _list_notes()
+
+
     @mcp_app.resource("notes://corpus")
     def get_notes_corpus() -> str:
-        """Expose the sample course notes as an MCP resource."""
+        """Expose the saved notes and sample course notes as an MCP resource."""
         notes_dir = Path(__file__).resolve().parents[1] / "data" / "sample_notes"
         items = []
+        from app.notes_store import all_notes
+        for topic, text in all_notes():
+            items.append({"file": f"saved:{topic}", "text": text.strip()[:120]})
         if notes_dir.exists():
             for path in sorted(notes_dir.glob("*.md")):
                 text = path.read_text(encoding="utf-8", errors="ignore").strip()

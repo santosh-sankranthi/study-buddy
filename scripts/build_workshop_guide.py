@@ -43,6 +43,7 @@ STEPS = [
     dict(n=3, frm="v2", to="v3", phase="Phase 3 — Agents & Tools", core=True,
          concepts=[
              ("Tools + function calling", "Real functions in `TOOL_REGISTRY` are executed.", "/agent/ask"),
+             ("Persistent notes", "`store_note` writes to `data/notes/` so saved notes survive new sessions.", "app/tools.py + /agent/ask"),
              ("ReAct loop", "Think → act → observe, with a visible trace.", "/agent/ask"),
              ("Agent loops", "Stop conditions: step cap + repeat detection.", "app/agent.py"),
              ("Multi-agent", "Planner → executor → critic.", "/agent/plan-and-execute"),
