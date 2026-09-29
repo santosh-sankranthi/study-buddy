@@ -1,5 +1,5 @@
 diff --git a/app/main.py b/app/main.py
-index 5cb5500..0b9e64a 100644
+index 7c939f8..0ac84f1 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -28,6 +28,8 @@ from __future__ import annotations
@@ -29,9 +29,9 @@ index 5cb5500..0b9e64a 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -435,6 +437,51 @@ def mcp_tools() -> list:
-     except Exception as exc:  # noqa: BLE001
-         raise HTTPException(status_code=503, detail=f"MCP server unavailable: {exc}")
+@@ -486,6 +488,51 @@ def mcp_external_ask(body: dict) -> dict:
+         raise HTTPException(status_code=503, detail=f"External MCP call failed: {exc}")
+     return {"repo": repo, "question": question, "result": result}
  
 +# ────────────────────────────────────────────────────────────────────────────
 +# CONCEPT · Regression testing  [Phase 6]

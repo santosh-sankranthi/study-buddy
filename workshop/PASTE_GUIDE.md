@@ -632,7 +632,7 @@ index b271cdf..d4ba23f 100644
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index d4ba23f..3e61461 100644
+index d4ba23f..16dac1e 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -51,7 +51,7 @@ from app.context import context_budget_warning, context_report
@@ -653,7 +653,7 @@ index d4ba23f..3e61461 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -388,6 +388,20 @@ def agent_plan_and_execute(body: dict) -> dict:
+@@ -388,6 +388,71 @@ def agent_plan_and_execute(body: dict) -> dict:
      from app.agent import plan_and_execute
      return plan_and_execute(body.get("question", ""))
  
@@ -670,6 +670,57 @@ index d4ba23f..3e61461 100644
 +        return list_mcp_tools()
 +    except Exception as exc:  # noqa: BLE001
 +        raise HTTPException(status_code=503, detail=f"MCP server unavailable: {exc}")
++
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · External MCP (live docs)  [Phase 4]
++# Call a remote MCP server over HTTP — a live documentation server.
++# ────────────────────────────────────────────────────────────────────────────
++
++@app.get("/mcp/external")
++def mcp_external_config() -> dict:
++    """Which external docs MCP server this build talks to (set in .env)."""
++    from app.mcp_client import external_mcp_config
++    return external_mcp_config()
++
++
++@app.get("/mcp/external/tools")
++def mcp_external_tools() -> list:
++    """Discover tools on the external MCP server, live over HTTP."""
++    from app.mcp_client import external_mcp_config, list_external_tools
++    try:
++        return list_external_tools(external_mcp_config()["url"])
++    except Exception as exc:  # noqa: BLE001
++        raise HTTPException(status_code=503, detail=f"External MCP server unavailable: {exc}")
++
++
++@app.post("/mcp/external/call")
++def mcp_external_call(body: dict) -> dict:
++    """Call any tool on the external MCP server and return its result."""
++    from app.mcp_client import call_external_tool, external_mcp_config
++    name = body.get("name", "")
++    args = body.get("arguments") or {}
++    try:
++        result = call_external_tool(name, args, external_mcp_config()["url"])
++    except Exception as exc:  # noqa: BLE001
++        raise HTTPException(status_code=503, detail=f"External MCP call failed: {exc}")
++    return {"tool": name, "arguments": args, "result": result}
++
++
++@app.post("/mcp/external/ask")
++def mcp_external_ask(body: dict) -> dict:
++    """Ask the external docs server a question (calls its ask tool)."""
++    from app.mcp_client import call_external_tool, external_mcp_config
++    cfg      = external_mcp_config()
++    repo     = body.get("repo") or "langchain-ai/langchain"
++    question = body.get("question", "")
++    if not question.strip():
++        raise HTTPException(status_code=422, detail="question is required")
++    args = {"repoName": repo, "question": question}
++    try:
++        result = call_external_tool(cfg["ask_tool"], args, cfg["url"])
++    except Exception as exc:  # noqa: BLE001
++        raise HTTPException(status_code=503, detail=f"External MCP call failed: {exc}")
++    return {"repo": repo, "question": question, "result": result}
 +
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · Frontend  [all phases]
@@ -701,7 +752,7 @@ index d4ba23f..3e61461 100644
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index 3e61461..5cb5500 100644
+index 16dac1e..7c939f8 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -48,10 +48,11 @@ from app.prompts import build_few_shot_prompt, build_system
@@ -844,7 +895,7 @@ index 3e61461..5cb5500 100644
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index 5cb5500..0b9e64a 100644
+index 7c939f8..0ac84f1 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -28,6 +28,8 @@ from __future__ import annotations
@@ -874,9 +925,9 @@ index 5cb5500..0b9e64a 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -435,6 +437,51 @@ def mcp_tools() -> list:
-     except Exception as exc:  # noqa: BLE001
-         raise HTTPException(status_code=503, detail=f"MCP server unavailable: {exc}")
+@@ -486,6 +488,51 @@ def mcp_external_ask(body: dict) -> dict:
+         raise HTTPException(status_code=503, detail=f"External MCP call failed: {exc}")
+     return {"repo": repo, "question": question, "result": result}
  
 +# ────────────────────────────────────────────────────────────────────────────
 +# CONCEPT · Regression testing  [Phase 6]
