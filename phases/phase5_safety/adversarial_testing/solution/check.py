@@ -1,30 +1,39 @@
-"""Self-check for Phase 5.5 Adversarial Testing."""
+"""Self-check for the Red-Teaming the Input Guard exercise.
+
+    python .../adversarial_testing/solution/check.py [--solution]
+"""
+
 import argparse
 import importlib.util
+import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-TARGET = HERE.parent
+CONCEPT = HERE.parent
 
-def main():
+
+def load(path: Path):
+    spec = importlib.util.spec_from_file_location("redteam_under_test", path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["redteam_under_test"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--solution", action="store_true")
     args = parser.parse_args()
 
-    target_file = (TARGET / "solution" / "main.py") if args.solution else (TARGET / "exercise" / "main.py")
-    spec = importlib.util.spec_from_file_location("adv_mod", target_file)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    target = CONCEPT / ("solution" if args.solution else "exercise") / "main.py"
+    module = load(target)
 
-    fn = getattr(mod, "run_redteam_tests", None)
-    assert fn is not None, "run_redteam_tests function must be defined"
+    results = module.run_redteam_tests()
+    assert results.get("attacks_blocked") is True, "the filter must block every attack"
+    assert results.get("benign_allowed") is True, "the filter must not block benign text"
 
-    results = fn()
-    assert isinstance(results, dict), "Must return a dictionary"
-    assert len(results) >= 3, "Must run at least 3 redteam tests"
-    assert all(results.values()), f"All redteam defenses must pass, got: {results}"
+    print("OK - blocked both attacks and allowed the benign question")
 
-    print(f"✅ Adversarial testing check passed ({target_file.name})!")
 
 if __name__ == "__main__":
     main()

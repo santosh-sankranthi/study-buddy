@@ -1,18 +1,22 @@
-"""SOLUTION -- International Phone PII Scrubbing."""
-import re
+"""SOLUTION -- PII Scrubbing.
 
-PATTERNS = {
-    "PHONE_IN": r"\+91[\s\-]?\d{10}",
-    "PHONE_UK": r"\+44[\s\-]?\d{10}",
-}
+Reference answer: app.security.scrub_pii already redacts IN and UK phone numbers.
+"""
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+
+from app.security import scrub_pii
+
+TEXT = "Contact me at +91 9876543210 or +44 7911123456"
+
 
 def scrub_international_phone(text: str) -> tuple[str, list[str]]:
-    detected = []
-    for label, pat in PATTERNS.items():
-        if re.search(pat, text):
-            detected.append(label)
-            text = re.sub(pat, f"[{label}_REDACTED]", text)
-    return text, detected
+    """Return (text with phones redacted, list of PII types detected)."""
+    return scrub_pii(text)
+
 
 if __name__ == "__main__":
-    print(scrub_international_phone("Reach me at +91 9876543210 please."))
+    print(scrub_international_phone(TEXT))

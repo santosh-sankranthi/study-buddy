@@ -1,32 +1,24 @@
-"""EXERCISE -- Same-Tool Loop Detection.
+"""EXERCISE -- Agent loops: detect a repeated tool call.
 
-The demo capped iterations at MAX_STEPS. Your twist: implement loop detection
-so that if the same tool is called with identical arguments twice in a row,
-the loop halts immediately with reason='loop_detected'.
+Practice: stop an agent that calls the same tool with the same arguments twice.
 
-Run when done:
+Task: finish detect_repetition() so it reports whether the last two calls match.
+
+Check your work with:
     python phases/phase3_agents_and_tools/agent_loops/solution/check.py
 """
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+CALLS = [
+    {"name": "search_notes", "arguments": '{"query": "mitosis"}'},
+    {"name": "search_notes", "arguments": '{"query": "mitosis"}'},
+]
 
-# TODO(1): Implement loop_detector(history: list[dict]) -> bool
-#   Given a list of tool calls [{'name': str, 'arguments': str}],
-#   return True if the last tool call is identical to the preceding one.
 
 def detect_repetition(tool_calls: list[dict]) -> bool:
-    raise NotImplementedError("TODO(1): implement detect_repetition")
-
-
-# TODO(2): Write one sentence explaining why loop detection is critical in production:
-OBSERVATION = ""
+    """Return True if the final tool call equals the one before it."""
+    # TODO: compare tool_calls[-1] with tool_calls[-2]; return False for < 2 calls.
+    raise NotImplementedError("detect_repetition")
 
 
 if __name__ == "__main__":
-    sample_calls = [
-        {"name": "search_notes", "arguments": '{"query": "mitosis"}'},
-        {"name": "search_notes", "arguments": '{"query": "mitosis"}'},
-    ]
-    print("Repetition detected:", detect_repetition(sample_calls))
+    print("Repeated:", detect_repetition(CALLS))

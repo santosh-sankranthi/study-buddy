@@ -1,15 +1,21 @@
-"""EXERCISE -- International Phone PII Scrubbing.
+"""EXERCISE -- PII Scrubbing.
 
-The demo scrubbed US phone numbers and emails.
-Your twist: implement scrub_international_phone(text: str) -> tuple[str, list[str]]
-to detect and scrub Indian (+91) and UK (+44) mobile phone numbers.
-
-Run when done:
-    python phases/phase5_safety/privacy/solution/check.py
+Practice: redact phone numbers from a message.
+Task: finish scrub_international_phone() so it returns the clean text and the PII types found.
+Check your work with: python phases/phase5_safety/privacy/solution/check.py
 """
-# TODO(1): Implement scrub_international_phone(text: str) -> tuple[str, list[str]]
-def scrub_international_phone(text: str) -> tuple[str, list[str]]:
-    raise NotImplementedError("TODO(1): implement scrub_international_phone")
 
-if __name__ == "__main__":
-    print(scrub_international_phone("Reach me at +91 9876543210 please."))
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+
+from app.security import scrub_pii
+
+TEXT = "Contact me at +91 9876543210 or +44 7911123456"
+
+
+def scrub_international_phone(text: str) -> tuple[str, list[str]]:
+    """Return (text with phones redacted, list of PII types detected)."""
+    # TODO: call scrub_pii(text) and return its (clean_text, detected) pair.
+    raise NotImplementedError("scrub_international_phone")

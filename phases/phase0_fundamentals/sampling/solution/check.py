@@ -1,43 +1,46 @@
-"""Self-check for Sampling exercise.
+"""Self-check for the Sampling exercise.
 
-Run from the repo root:
-    python phases/phase0_fundamentals/sampling/solution/check.py
-    python phases/phase0_fundamentals/sampling/solution/check.py --solution
+    python .../sampling/solution/check.py             # checks your exercise
+    python .../sampling/solution/check.py --solution  # checks the reference
+
+This one calls the live model, so pytest skips it unless you pass
+``--run-llm-checks``; run it directly to try it.
 """
 
 import argparse
+import importlib.util
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+HERE = Path(__file__).resolve().parent
+CONCEPT = HERE.parent
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--solution", action="store_true", help="Check reference solution instead of exercise.")
-args = parser.parse_args()
 
-if args.solution:
-    from phases.phase0_fundamentals.sampling.solution.main import OBSERVATION, results
-else:
-    from phases.phase0_fundamentals.sampling.exercise.main import OBSERVATION, results
+def load(path: Path):
+    spec = importlib.util.spec_from_file_location("sampling_under_test", path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["sampling_under_test"] = module
+    spec.loader.exec_module(module)
+    return module
 
-print("Checking sampling exercise ...\n")
 
-# ── Check 1: results dict has the right keys
-assert set(results.keys()) == {0.1, 0.5, 1.0}, \
-    f"results dict must have keys 0.1, 0.5, 1.0. Got: {set(results.keys())}"
-print("✅  results dict has correct top_p keys")
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--solution", action="store_true")
+    args = parser.parse_args()
 
-# ── Check 2: each key maps to a list of N_RUNS strings
-for top_p, runs in results.items():
-    assert isinstance(runs, list), f"results[{top_p}] must be a list, got {type(runs)}"
-    assert len(runs) == 3, f"results[{top_p}] must have 3 runs, got {len(runs)}"
-    assert all(isinstance(r, str) and r.strip() for r in runs), \
-        f"All runs for top_p={top_p} must be non-empty strings"
-print("✅  each top_p has exactly 3 non-empty result strings")
+    target = CONCEPT / ("solution" if args.solution else "exercise") / "main.py"
+    module = load(target)
 
-# ── Check 3: OBSERVATION is filled in
-assert isinstance(OBSERVATION, str) and len(OBSERVATION.strip()) > 20, \
-    "OBSERVATION must be a non-empty string (> 20 chars). Did you fill in TODO(2)?"
-print("✅  OBSERVATION is filled in")
+    assert module.build_messages() == [{"role": "user", "content": module.PROMPT}]
+    assert module.TEMPERATURE == 1.0, "temperature must stay fixed at 1.0"
 
-print("\n✅  All checks passed! Great work.")
+    replies = module.sample(0.5, 2)
+    assert isinstance(replies, list) and len(replies) == 2, "sample() must return one reply per run"
+    assert all(isinstance(r, str) and r.strip() for r in replies), "replies must be non-empty strings"
+
+    print(f"OK - sampled {len(replies)} non-empty replies at top_p=0.5")
+
+
+if __name__ == "__main__":
+    main()

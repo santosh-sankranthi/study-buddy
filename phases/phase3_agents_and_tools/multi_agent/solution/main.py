@@ -1,8 +1,17 @@
-"""SOLUTION -- Multi-Agent Critic Verification."""
+"""SOLUTION -- Multi-agent: a critic checks the result."""
+
+STEP = "Find the biology exam date."
+GOOD = "Biology exam is scheduled for 2026-11-15."
+BAD = ""
+
+
 def critic(step: str, result: str) -> tuple[bool, str]:
-    if not result or len(result.strip()) < 10 or "error" in result.lower():
-        return False, "Result is too brief or contains an error."
-    return True, "Approved: adequately addresses the requested step."
+    """Return (approved, reason)."""
+    if len(result.strip()) < 10 or "error" in result.lower():
+        return False, "Result is empty, too brief, or contains an error."
+    return True, "Result adequately addresses the step."
+
 
 if __name__ == "__main__":
-    print(critic("Find exam date", "Biology exam is on 2026-11-15."))
+    print(critic(STEP, GOOD))
+    print(critic(STEP, BAD))

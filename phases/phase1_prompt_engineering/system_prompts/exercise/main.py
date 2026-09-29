@@ -1,26 +1,21 @@
-"""EXERCISE -- System Prompts: add the FLASHCARD persona.
+"""EXERCISE -- System Prompts.
 
-The demo added TUTOR_SYSTEM_PROMPT.
-Your twist: define FLASHCARD_SYSTEM_PROMPT instructing the model to reply ONLY
-with valid JSON: {"front": "...", "back": "..."}.
+Practice: a system message fixes the model's role and output format.
 
-Run when done:
+Task: write FLASHCARD_SYSTEM_PROMPT and build_messages().
+
+Check your work with:
     python phases/phase1_prompt_engineering/system_prompts/solution/check.py
 """
-import json
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+FLASHCARD_SYSTEM_PROMPT = ""  # TODO(1): reply ONLY with JSON {"front": ..., "back": ...}
 
-from common.llm import chat
 
-# TODO(1): Define FLASHCARD_SYSTEM_PROMPT
-FLASHCARD_SYSTEM_PROMPT = ""
+def build_messages(topic: str) -> list[dict]:
+    """Return the [system, user] messages for one flashcard."""
+    # TODO(2): system message = the prompt; user message = topic.
+    raise NotImplementedError("build_messages")
 
-def generate_flashcard(topic: str) -> dict:
-    """Call chat() with FLASHCARD_SYSTEM_PROMPT and return the parsed JSON dict."""
-    raise NotImplementedError("TODO(2): implement generate_flashcard")
 
 if __name__ == "__main__":
-    print(generate_flashcard("Cellular respiration"))
+    print(build_messages("Cellular respiration"))

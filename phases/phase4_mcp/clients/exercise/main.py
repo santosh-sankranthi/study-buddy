@@ -1,9 +1,8 @@
-"""EXERCISE -- Call calculate_grade through MCP Client.
+"""Practice: dispatch a tool call by name through a tiny MCP-style client.
 
-The demo listed MCP tools.
-Your twist: execute calculate_grade through the MCP protocol end-to-end.
+Task: finish call_tool() so it finds `name` in TOOLS and calls it with `args`.
 
-Run when done:
+Check your work with:
     python phases/phase4_mcp/clients/solution/check.py
 """
 import sys
@@ -11,15 +10,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
-from app.mcp_client import call_mcp_tool
+from app.tools import calculate_grade
 
-# TODO(1): Call call_mcp_tool("calculate_grade", {"scores": [85.0, 90.0, 95.0], "weights": [0.2, 0.3, 0.5]})
-#   Store the result in `grade_result` and print it.
+TOOLS = {"calculate_grade": calculate_grade}
 
-grade_result = ""
+
+def call_tool(name: str, args: dict) -> str:
+    """Call the registered tool `name` with the keyword arguments in `args`."""
+    # TODO: look `name` up in TOOLS and call it with **args.
+    raise NotImplementedError("call_tool")
 
 
 if __name__ == "__main__":
-    # TODO(2): Uncomment and run once implemented:
-    # assert grade_result != "", "TODO: assign grade_result"
-    print("MCP grade result:", grade_result)
+    print(call_tool("calculate_grade", {"scores": [85.0, 90.0, 95.0], "weights": [0.2, 0.3, 0.5]}))

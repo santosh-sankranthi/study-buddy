@@ -1,30 +1,37 @@
-"""Self-check for Phase 1.3 CoT."""
+"""Self-check for the Chain of Thought exercise: python check.py [--solution]."""
+
 import argparse
 import importlib.util
+import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-TARGET = HERE.parent
+CONCEPT = HERE.parent
 
-def main():
+
+def load(path: Path):
+    spec = importlib.util.spec_from_file_location("cot_under_test", path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["cot_under_test"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--solution", action="store_true")
     args = parser.parse_args()
 
-    target_file = (TARGET / "solution" / "main.py") if args.solution else (TARGET / "exercise" / "main.py")
-    spec = importlib.util.spec_from_file_location("mod", target_file)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    target = CONCEPT / ("solution" if args.solution else "exercise") / "main.py"
+    module = load(target)
 
-    r_no = getattr(mod, "results_no_cot", [])
-    r_cot = getattr(mod, "results_cot", [])
-    assert len(r_no) == 3, "TODO(1): results_no_cot must have 3 entries"
-    assert len(r_cot) == 3, "TODO(2): results_cot must have 3 entries"
+    prompt = module.cot_prompt(module.PROBLEM)
+    assert module.PROBLEM in prompt, "cot_prompt must keep the original problem"
+    assert "step by step" in prompt.lower(), "cot_prompt must ask for step-by-step reasoning"
+    assert module.extract_answer("reasoning <answer>82.67</answer>") == "82.67"
+    assert module.extract_answer("no tags here") == "no tags here"
+    print("OK - cot_prompt adds the instruction and extract_answer reads the tag")
 
-    obs = getattr(mod, "OBSERVATION", "")
-    assert isinstance(obs, str) and len(obs.strip()) > 20, "TODO(3): OBSERVATION must be > 20 characters"
-
-    print(f"✅ CoT check passed ({target_file.name})!")
 
 if __name__ == "__main__":
     main()

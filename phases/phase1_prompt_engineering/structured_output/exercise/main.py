@@ -1,27 +1,26 @@
-"""EXERCISE -- Structured Output: StudyPlanDay Schema.
+"""EXERCISE -- Structured Output.
 
-The demo validated Flashcard objects.
-Your twist: define StudyPlanDay with subject, topics, and minutes,
-and validate a list of StudyPlanDay items.
+Practice: a Pydantic model validates the shape of model output.
 
-Run when done:
+Task: fill in StudyPlanDay and parse_and_validate_plan().
+
+Check your work with:
     python phases/phase1_prompt_engineering/structured_output/solution/check.py
 """
+
 from pydantic import BaseModel
 
-# TODO(1): Define StudyPlanDay schema
-#   subject: str
-#   topics: list[str]
-#   minutes: int
+
 class StudyPlanDay(BaseModel):
+    # TODO(1): fields subject: str, topics: list[str], minutes: int
     pass
 
-# TODO(2): Implement parse_and_validate_plan(json_list: list[dict]) -> list[StudyPlanDay]
-def parse_and_validate_plan(json_list: list[dict]) -> list[StudyPlanDay]:
-    raise NotImplementedError("TODO(2): implement parse_and_validate_plan")
 
-def generate_study_plan(subjects: list[str], total_hours: int) -> list[StudyPlanDay]:
-    raise NotImplementedError("TODO: implement generate_study_plan")
+def parse_and_validate_plan(json_list: list[dict]) -> list[StudyPlanDay]:
+    """Validate each dict and return the list of StudyPlanDay."""
+    # TODO(2): use StudyPlanDay.model_validate() on each item.
+    raise NotImplementedError("parse_and_validate_plan")
+
 
 if __name__ == "__main__":
-    print(generate_study_plan(["Biology", "Math"], 4))
+    print(parse_and_validate_plan([{"subject": "Math", "topics": ["Algebra"], "minutes": 60}]))

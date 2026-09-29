@@ -1,10 +1,8 @@
-"""EXERCISE -- Add calculate_grade to MCP Server.
+"""Practice: expose calculate_grade as a tool on a tiny MCP-style server.
 
-The demo exposed search_notes and get_exam_schedule as MCP tools.
-Your twist: register calculate_grade in the MCP server so clients can
-calculate weighted averages over the standard protocol.
+Task: finish register_grade_tool() so it stores calculate_grade under its name.
 
-Run when done:
+Check your work with:
     python phases/phase4_mcp/servers/solution/check.py
 """
 import sys
@@ -12,15 +10,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
-# TODO(1): In mcp_server/server.py (or implement below):
-#   Import calculate_grade from app.tools
-#   Expose it with @mcp_app.tool()
+from app.tools import calculate_grade
 
-def register_grade_tool(server) -> bool:
-    """Register calculate_grade with server and return True if successful."""
-    raise NotImplementedError("TODO(1): register calculate_grade on the MCP server")
+SERVER_TOOLS: dict = {}
+
+
+def register_grade_tool(server: dict) -> bool:
+    """Store calculate_grade in `server`; return True once it is registered."""
+    # TODO: put calculate_grade into `server` under the key "calculate_grade".
+    raise NotImplementedError("register_grade_tool")
 
 
 if __name__ == "__main__":
-    from mcp_server.server import mcp_app
-    print("Registration status:", register_grade_tool(mcp_app))
+    print("Registered:", register_grade_tool(SERVER_TOOLS))

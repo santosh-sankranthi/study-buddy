@@ -1,18 +1,21 @@
-"""SOLUTION -- Context Compaction: Keep Last 2."""
-def setup_test_conversation(session_id: str) -> list[dict]:
-    return [
-        {"role": "user" if i % 2 == 0 else "assistant", "content": f"Message {i} in session {session_id}"}
-        for i in range(8)
-    ]
+"""SOLUTION -- Context Compaction.
+
+Reference answer: replace everything but the last two turns with a summary.
+"""
+
+CONVERSATION = [
+    {"role": "user" if i % 2 == 0 else "assistant", "content": f"Message {i}"}
+    for i in range(8)
+]
+
 
 def compact_keep_last2(messages: list[dict]) -> list[dict]:
+    """Return a system summary followed by the last two messages."""
     if len(messages) <= 4:
         return messages
-    older = messages[:-2]
-    last2 = messages[-2:]
-    summary = f"[SUMMARY] Conversation covered {len(older)} earlier turns."
-    return [{"role": "system", "content": summary}] + last2
+    summary = {"role": "system", "content": f"[SUMMARY] {len(messages) - 2} earlier messages"}
+    return [summary] + messages[-2:]
+
 
 if __name__ == "__main__":
-    conv = setup_test_conversation("session_1")
-    print("Compacted:", compact_keep_last2(conv))
+    print("Compacted:", compact_keep_last2(CONVERSATION))

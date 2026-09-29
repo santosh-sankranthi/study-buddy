@@ -1,21 +1,26 @@
-"""EXERCISE -- Multi-Guard Agent Safety Checks.
+"""EXERCISE -- Agent safety: step cap and loop detection.
 
-The demo caught back-to-back loop detection.
-Your twist: implement check_agent_safety() evaluating actions against
-MAX_STEPS and consecutive-action loop detection.
+Practice: halt a runaway agent before it burns tokens.
 
-Run when done:
+Task: finish check_agent_safety() so it returns (halted, reason, steps).
+
+Check your work with:
     python phases/phase3_agents_and_tools/agent_safety/solution/check.py
 """
-# TODO(1): Implement check_agent_safety(actions: list[str], max_steps: int = 5) -> tuple[bool, str, int]
-# Returns (halted: bool, reason: str, executed_steps: int)
-# reasons: 'done', 'loop_detected', 'max_steps'
-def check_agent_safety(actions: list[str], max_steps: int = 5) -> tuple[bool, str, int]:
-    raise NotImplementedError("TODO(1): implement check_agent_safety")
 
-# TODO(2): Write observation on deterministic guardrails
-OBSERVATION = ""
+MAX_STEPS = 5
+ACTIONS = ["search_notes('bio')", "search_notes('bio')"]
+
+
+def check_agent_safety(actions: list[str], max_steps: int = MAX_STEPS) -> tuple[bool, str, int]:
+    """Return (halted, reason, executed_steps).
+
+    reasons: 'done' when a FINISH action or the actions run out, 'loop_detected'
+    when the same action repeats back-to-back, 'max_steps' when the cap is hit.
+    """
+    # TODO: walk the actions up to max_steps, tracking the previous action.
+    raise NotImplementedError("check_agent_safety")
+
 
 if __name__ == "__main__":
-    seq = ["search_notes('bio')", "search_notes('bio')"]
-    print("Result:", check_agent_safety(seq, 5))
+    print(check_agent_safety(ACTIONS))

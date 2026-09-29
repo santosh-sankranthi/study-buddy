@@ -1,33 +1,38 @@
-"""Self-check for Phase 3.1 Deterministic Evals."""
+"""Self-check for the Deterministic Schema Check exercise.
+
+    .../deterministic_evals/solution/check.py             # checks your exercise
+    .../deterministic_evals/solution/check.py --solution  # checks the reference
+"""
+
 import argparse
 import importlib.util
+import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-TARGET = HERE.parent
+CONCEPT = HERE.parent
 
-def main():
+
+def load(path: Path):
+    spec = importlib.util.spec_from_file_location("deterministic_under_test", path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["deterministic_under_test"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--solution", action="store_true")
     args = parser.parse_args()
+    target = CONCEPT / ("solution" if args.solution else "exercise") / "main.py"
+    module = load(target)
 
-    target_file = (TARGET / "solution" / "main.py") if args.solution else (TARGET / "exercise" / "main.py")
-    spec = importlib.util.spec_from_file_location("mod", target_file)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    assert module.verify_study_plan_topics([{"topics": ["Algebra"]}]) is True
+    assert module.verify_study_plan_topics([{"topics": []}]) is False
+    assert module.verify_study_plan_topics([{"topics": [" "]}]) is False
+    print("OK - deterministic schema check validated")
 
-    fn = getattr(mod, "verify_study_plan_topics", None)
-    assert fn is not None, "verify_study_plan_topics must be defined"
-
-    good = [{"subject": "Physics", "topics": ["Kinematics", "Optics"], "minutes": 90}]
-    res = fn(good)
-    assert res.get("passed") is True, "Valid plan must pass"
-
-    bad = [{"subject": "Physics", "topics": [""], "minutes": 90}]
-    res_bad = fn(bad)
-    assert res_bad.get("passed") is False, "Empty topic string must fail"
-
-    print(f"✅ Deterministic evals check passed ({target_file.name})!")
 
 if __name__ == "__main__":
     main()

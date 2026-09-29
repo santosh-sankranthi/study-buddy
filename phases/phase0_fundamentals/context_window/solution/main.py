@@ -1,15 +1,13 @@
-"""SOLUTION -- Context Windows (reference answer to the twist)."""
+"""SOLUTION -- Context Windows: compute the note budget."""
 
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
-from common.tokens import count_tokens  # noqa: E402
+from common.tokens import count_tokens
 
-SYSTEM_PROMPT = (
-    "You are Study Buddy, a patient tutor. Answer only from the student's notes."
-)
+SYSTEM_PROMPT = "You are Study Buddy, a patient tutor. Answer only from the student's notes."
 HISTORY = [
     ("What is photosynthesis?", "It converts light into chemical energy."),
     ("Where does it happen?", "In the chloroplasts of plant cells."),
@@ -25,14 +23,13 @@ WORDS_PER_TOKEN = 0.75
 def tokens_used_so_far() -> int:
     """Tokens taken by the system prompt plus all 5 history turns."""
     total = count_tokens(SYSTEM_PROMPT)
-    for user_message, assistant_reply in HISTORY:
-        total += count_tokens(user_message)
-        total += count_tokens(assistant_reply)
+    for question, answer in HISTORY:
+        total += count_tokens(question) + count_tokens(answer)
     return total
 
 
 def note_budget_words() -> int:
-    """How many words of notes fit in what's left, after reserving the reply."""
+    """How many words of notes fit after the reply reserve."""
     left = CONTEXT_BUDGET - REPLY_RESERVE_TOKENS - tokens_used_so_far()
     if left < 0:
         return 0
@@ -41,6 +38,4 @@ def note_budget_words() -> int:
 
 if __name__ == "__main__":
     print("fixed tokens used:", tokens_used_so_far())
-    print(f"reply reserve   : {REPLY_RESERVE_TOKENS}")
-    print(f"budget          : {CONTEXT_BUDGET}")
     print("note words that fit:", note_budget_words())

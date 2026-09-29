@@ -1,28 +1,41 @@
-"""Self-check for Phase 3.2 Live Function Calling."""
+"""Self-check for the Function Calling exercise.
+
+    python .../function_calling_live/solution/check.py             # your exercise
+    python .../function_calling_live/solution/check.py --solution  # the reference
+"""
+
 import argparse
 import importlib.util
+import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-TARGET = HERE.parent
+CONCEPT = HERE.parent
 
-def main():
+
+def load(path: Path):
+    spec = importlib.util.spec_from_file_location("mod_under_test", path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["mod_under_test"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--solution", action="store_true")
     args = parser.parse_args()
 
-    target_file = (TARGET / "solution" / "main.py") if args.solution else (TARGET / "exercise" / "main.py")
-    spec = importlib.util.spec_from_file_location("mod", target_file)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    target = CONCEPT / ("solution" if args.solution else "exercise") / "main.py"
+    module = load(target)
 
-    fn = getattr(mod, "dispatch_grade_tool", None)
-    assert fn is not None, "dispatch_grade_tool must be defined"
+    result = module.dispatch_grade_tool([80.0, 90.0, 70.0], [0.3, 0.4, 0.3])
+    assert isinstance(result, str), "dispatch_grade_tool should return a string"
+    assert "81.00" in result, f"the real tool should compute 81.00, got: {result}"
+    assert "%" in result, "the tool result should be a percentage"
 
-    res = fn([80.0, 90.0, 70.0], [0.3, 0.4, 0.3])
-    assert "%" in res or "80" in res or "81" in res, f"Expected grade in result, got: {res}"
+    print(f"OK - dispatched tool call returned {result}")
 
-    print(f"✅ Function calling live check passed ({target_file.name})!")
 
 if __name__ == "__main__":
     main()

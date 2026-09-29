@@ -1,23 +1,18 @@
-"""EXERCISE -- Tool Schema Shape: calculate_grade.
+"""EXERCISE -- Function Calling Schema.
 
-The demo registered search_notes and get_exam_schedule schemas.
-Your twist: write the tool schema dict for calculate_grade.
+Practice: a tool schema tells the model a function's name and arguments.
 
-Run when done:
+Task: fill in GRADE_TOOL_SCHEMA for calculate_grade(scores, weights).
+
+Check your work with:
     python phases/phase1_prompt_engineering/function_calling_concept/solution/check.py
 """
-# TODO(1): Define GRADE_TOOL_SCHEMA dict adhering to the OpenAI function calling schema format:
-# {
-#     "type": "function",
-#     "function": {
-#         "name": "calculate_grade",
-#         "description": "...",
-#         "parameters": { ... scores and weights array properties ... },
-#         "required": ["scores", "weights"],
-#     }
-# }
 
 GRADE_TOOL_SCHEMA: dict = {}
+# TODO: give it "type": "function" and a "function" dict with "name": "calculate_grade",
+# a "description", and "parameters" whose "properties" are the arrays "scores" and
+# "weights" (type "number" items), both listed in "required".
+
 
 if __name__ == "__main__":
     print(GRADE_TOOL_SCHEMA)

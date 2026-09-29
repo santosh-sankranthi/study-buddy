@@ -1,23 +1,25 @@
-"""EXERCISE -- Context Sources: Metadata Injection.
+"""EXERCISE -- Context Sources.
 
-The demo inspected token distribution per role.
-Your twist: implement build_personalized_system_prompt() to inject
-the student's name, study goal, and current date at the top of the prompt.
+Practice: inject today's date, the student's name and goal into a system prompt.
 
-Run when done:
+Task: finish build_personalized_system_prompt() to prepend those metadata lines.
+
+Check your work with:
     python phases/phase2_context_engineering/context_sources/solution/check.py
 """
-from datetime import datetime
 
-# TODO(1): Implement build_personalized_system_prompt(name: str, goal: str, date_str: str | None = None) -> str
-# Format:
-#   Today is <date_str>.
-#   The student's name is <name>.
-#   Current study goal: <goal>.
-#   <Base tutor persona>
 
 def build_personalized_system_prompt(name: str, goal: str, date_str: str | None = None) -> str:
-    raise NotImplementedError("TODO(1): implement build_personalized_system_prompt")
+    """Return metadata lines (date, name, goal) followed by the tutor persona."""
+    # TODO: default date_str to today (from datetime import datetime) when it is
+    # None, then join and return these lines:
+    #   Today is <date>.
+    #   The student's name is <name>.
+    #   Current study goal: <goal>.
+    #   <blank>
+    #   You are Study Buddy, a patient tutor.
+    raise NotImplementedError("build_personalized_system_prompt")
+
 
 if __name__ == "__main__":
-    print(build_personalized_system_prompt("Alice", "Pass Biology Exam"))
+    print(build_personalized_system_prompt("Alice", "Pass Biology Exam", "Monday, Oct 1"))

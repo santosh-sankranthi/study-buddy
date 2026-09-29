@@ -1,32 +1,27 @@
-"""EXERCISE -- Wire calculate_grade into TOOL_REGISTRY.
+"""EXERCISE -- Tools: register a real function.
 
-The demo registered search_notes and get_exam_schedule.
-Your twist: implement calculate_grade and wire it into TOOL_REGISTRY.
+Practice: a tool is just a Python function the model may call by name.
 
-Run when done:
+Task: finish calculate_grade() and add it to TOOL_REGISTRY.
+
+Check your work with:
     python phases/phase3_agents_and_tools/tools/solution/check.py
 """
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+SCORES = [80.0, 90.0, 70.0]
+WEIGHTS = [0.3, 0.4, 0.3]
 
-# TODO(1): In app/tools.py (or implement below for self-check):
-#   Implement calculate_grade(scores: list[float], weights: list[float]) -> str
-#   - Check that len(scores) == len(weights)
-#   - Calculate weighted average: sum(s * w) / sum(w)
-#   - Return string: "Weighted average: <grade>%"
 
 def calculate_grade(scores: list[float], weights: list[float]) -> str:
-    raise NotImplementedError("TODO(1): implement calculate_grade")
+    """Return the weighted average, e.g. 'Weighted average grade: 81.00%'."""
+    # TODO: divide sum(score * weight) by sum(weights) and format with :.2f.
+    raise NotImplementedError("calculate_grade")
 
 
-# TODO(2): Register calculate_grade in TOOL_REGISTRY
-# TOOL_REGISTRY["calculate_grade"] = calculate_grade
+TOOL_REGISTRY: dict[str, object] = {}
+# TODO: TOOL_REGISTRY["calculate_grade"] = calculate_grade
 
 
 if __name__ == "__main__":
-    scores = [80.0, 90.0, 70.0]
-    weights = [0.3, 0.4, 0.3]
-    result = calculate_grade(scores, weights)
-    print("Calculated grade:", result)
+    print(calculate_grade(SCORES, WEIGHTS))
+    print("Registered tools:", list(TOOL_REGISTRY))

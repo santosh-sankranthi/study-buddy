@@ -1,8 +1,15 @@
-"""SOLUTION -- Long Context Cost Measurement."""
-def calculate_cost(tokens: int, price_per_million: float = 0.50) -> float:
-    return round((tokens / 1_000_000.0) * price_per_million, 6)
+"""SOLUTION -- Long Context.
 
-OBSERVATION = "Passing entire documents directly into context causes linear cost escalation and quadratic attention latency, motivating keeping the context small and targeted."
+Reference answer: convert tokens to millions and multiply by the price.
+"""
+
+TOKENS = 100_000
+
+
+def calculate_cost(tokens: int, price_per_million: float = 0.50) -> float:
+    """Return the dollar cost of `tokens` at the given price per million."""
+    return (tokens / 1_000_000) * price_per_million
+
 
 if __name__ == "__main__":
-    print(calculate_cost(100_000))
+    print("Cost for 100k tokens:", calculate_cost(TOKENS))

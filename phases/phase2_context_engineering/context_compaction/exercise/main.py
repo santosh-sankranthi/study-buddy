@@ -1,22 +1,26 @@
-"""EXERCISE -- Context Compaction: Keep Last 2.
+"""EXERCISE -- Context Compaction.
 
-The demo summarized the oldest half.
-Your twist: implement compact_keep_last2() to preserve the running summary
-plus only the last 2 turns verbatim.
+Practice: compress a long chat by replacing old turns with one summary message.
 
-Run when done:
+Task: finish compact_keep_last2() so it keeps a summary plus the last two turns.
+
+Check your work with:
     python phases/phase2_context_engineering/context_compaction/solution/check.py
 """
-def setup_test_conversation(session_id: str) -> list[dict]:
-    return [
-        {"role": "user" if i % 2 == 0 else "assistant", "content": f"Message {i} in session {session_id}"}
-        for i in range(8)
-    ]
 
-# TODO(1): Implement compact_keep_last2(messages: list[dict]) -> list[dict]
+CONVERSATION = [
+    {"role": "user" if i % 2 == 0 else "assistant", "content": f"Message {i}"}
+    for i in range(8)
+]
+
+
 def compact_keep_last2(messages: list[dict]) -> list[dict]:
-    raise NotImplementedError("TODO(1): implement compact_keep_last2")
+    """Return a system summary followed by the last two messages."""
+    # TODO: if there are more than 4 messages, return
+    #   [{"role": "system", "content": "[SUMMARY] ..."}] + messages[-2:]
+    # otherwise return messages unchanged.
+    raise NotImplementedError("compact_keep_last2")
+
 
 if __name__ == "__main__":
-    conv = setup_test_conversation("session_1")
-    print("Compacted:", compact_keep_last2(conv))
+    print("Compacted:", compact_keep_last2(CONVERSATION))

@@ -1,32 +1,44 @@
-"""Self-check for Phase 3.4 Metrics & Regression."""
+"""Self-check for the Regression Pass Rate exercise.
+
+    .../metrics_regression/solution/check.py             # checks your exercise
+    .../metrics_regression/solution/check.py --solution  # checks the reference
+"""
+
 import argparse
 import importlib.util
+import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-TARGET = HERE.parent
+CONCEPT = HERE.parent
 
-def main():
+
+def load(path: Path):
+    spec = importlib.util.spec_from_file_location("metrics_under_test", path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["metrics_under_test"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--solution", action="store_true")
     args = parser.parse_args()
+    target = CONCEPT / ("solution" if args.solution else "exercise") / "main.py"
+    module = load(target)
 
-    target_file = (TARGET / "solution" / "main.py") if args.solution else (TARGET / "exercise" / "main.py")
-    spec = importlib.util.spec_from_file_location("mod", target_file)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    assert len(module.EVAL_CASES) >= 5, "EVAL_CASES should hold at least 5 cases"
 
-    cases = getattr(mod, "EVAL_CASES", [])
-    assert len(cases) >= 5, "TODO(1): EVAL_CASES must have at least 5 test cases"
+    cases = [
+        {"expected_substr": "yes", "answer": "yes indeed"},
+        {"expected_substr": "zzz", "answer": "not found here"},
+    ]
+    report = module.run_regression_suite(cases)
+    assert report["total"] == 2 and report["passed"] == 1
+    assert abs(report["pass_rate"] - 0.5) < 1e-9, "pass_rate must be computed"
+    print("OK - regression pass rate computed from answers")
 
-    fn = getattr(mod, "run_regression_suite", None)
-    assert fn is not None, "run_regression_suite must be defined"
-
-    rep = fn(cases)
-    assert rep.get("total") >= 5, "Total must be at least 5"
-    assert 0.0 <= rep.get("pass_rate", -1.0) <= 1.0, "Pass rate must be between 0 and 1"
-
-    print(f"✅ Regression testing check passed ({target_file.name})!")
 
 if __name__ == "__main__":
     main()

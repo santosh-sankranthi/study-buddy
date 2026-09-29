@@ -1,17 +1,24 @@
-"""EXERCISE -- Multi-Agent Critic Verification.
+"""EXERCISE -- Multi-agent: a critic checks the result.
 
-The demo implemented Planner -> Executor.
-Your twist: implement a Critic function that evaluates an executor output
-and returns (approved: bool, reason: str).
+Practice: a critic decides whether an executor's result is good enough.
 
-Run when done:
+Task: finish critic() so it approves useful results and rejects weak ones.
+
+Check your work with:
     python phases/phase3_agents_and_tools/multi_agent/solution/check.py
 """
-# TODO(1): Implement critic(step: str, result: str) -> tuple[bool, str]
-# Return (True, "Good") if result contains relevant info and is non-empty;
-# otherwise return (False, "Needs more detail").
+
+STEP = "Find the biology exam date."
+GOOD = "Biology exam is scheduled for 2026-11-15."
+BAD = ""
+
+
 def critic(step: str, result: str) -> tuple[bool, str]:
-    raise NotImplementedError("TODO(1): implement critic")
+    """Return (approved, reason); reject empty results or ones containing 'error'."""
+    # TODO: return (False, reason) for weak results, (True, reason) otherwise.
+    raise NotImplementedError("critic")
+
 
 if __name__ == "__main__":
-    print(critic("Find exam date", "Biology exam is on 2026-11-15."))
+    print(critic(STEP, GOOD))
+    print(critic(STEP, BAD))

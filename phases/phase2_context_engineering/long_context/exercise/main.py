@@ -1,20 +1,21 @@
-"""EXERCISE -- Long Context Cost Measurement.
+"""EXERCISE -- Long Context.
 
-The demo measured latency across token counts.
-Your twist: implement calculate_cost(tokens: int, price_per_million: float = 0.50) -> float
-and record an observation on cost growth.
+Practice: estimate the API cost of a prompt from its token count.
 
-Run when done:
+Task: finish calculate_cost() using (tokens / 1_000_000) * price_per_million.
+
+Check your work with:
     python phases/phase2_context_engineering/long_context/solution/check.py
 """
-# TODO(1): Implement calculate_cost(tokens: int, price_per_million: float = 0.50) -> float
-# Formula: (tokens / 1_000_000) * price_per_million
-def calculate_cost(tokens: int, price_per_million: float = 0.50) -> float:
-    raise NotImplementedError("TODO(1): implement calculate_cost")
 
-# TODO(2): Write one sentence describing the cost-latency tradeoff of stuffing full documents into context:
-OBSERVATION = ""
+TOKENS = 100_000
+
+
+def calculate_cost(tokens: int, price_per_million: float = 0.50) -> float:
+    """Return the dollar cost of `tokens` at the given price per million."""
+    # TODO: convert tokens to millions and multiply by the price.
+    raise NotImplementedError("calculate_cost")
+
 
 if __name__ == "__main__":
-    print("Cost for 100k tokens:", calculate_cost(100_000))
-    print("Observation:", OBSERVATION)
+    print("Cost for 100k tokens:", calculate_cost(TOKENS))

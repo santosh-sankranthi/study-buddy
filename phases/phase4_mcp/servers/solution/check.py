@@ -1,39 +1,40 @@
-"""Self-check for Phase 4.1 MCP Servers."""
+"""Self-check for the MCP Servers exercise.
+
+    python .../servers/solution/check.py             # checks your exercise
+    python .../servers/solution/check.py --solution  # checks the reference
+"""
 import argparse
 import importlib.util
+import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-TARGET = HERE.parent
+CONCEPT = HERE.parent
 
-class MockServer:
-    def __init__(self):
-        self.registered = []
-    def tool(self):
-        def dec(fn):
-            self.registered.append(fn.__name__)
-            return fn
-        return dec
 
-def main():
+def load(path: Path):
+    spec = importlib.util.spec_from_file_location("servers_under_test", path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["servers_under_test"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--solution", action="store_true")
     args = parser.parse_args()
 
-    target_file = (TARGET / "solution" / "main.py") if args.solution else (TARGET / "exercise" / "main.py")
-    spec = importlib.util.spec_from_file_location("srv_mod", target_file)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    target = CONCEPT / ("solution" if args.solution else "exercise") / "main.py"
+    module = load(target)
 
-    fn = getattr(mod, "register_grade_tool", None)
-    assert fn is not None, "register_grade_tool function must be defined"
+    server = {}
+    assert module.register_grade_tool(server) is True, "must return True"
+    assert "calculate_grade" in server, "calculate_grade must be registered"
+    assert "75" in server["calculate_grade"]([100.0, 50.0], [0.5, 0.5])
 
-    mock = MockServer()
-    status = fn(mock)
-    assert status is True, "register_grade_tool must return True on success"
-    assert "calculate_grade" in mock.registered, "calculate_grade must be registered as a tool"
+    print(f"OK - server exposes {sorted(server)}")
 
-    print(f"✅ MCP Servers check passed ({target_file.name})!")
 
 if __name__ == "__main__":
     main()

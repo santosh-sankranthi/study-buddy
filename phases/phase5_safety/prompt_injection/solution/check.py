@@ -1,32 +1,40 @@
-"""Self-check for Phase 5.1 Prompt Injection."""
+"""Self-check for the Prompt Injection Scan exercise.
+
+    python .../prompt_injection/solution/check.py [--solution]
+"""
+
 import argparse
 import importlib.util
+import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-TARGET = HERE.parent
+CONCEPT = HERE.parent
 
-def main():
+
+def load(path: Path):
+    spec = importlib.util.spec_from_file_location("injection_under_test", path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["injection_under_test"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--solution", action="store_true")
     args = parser.parse_args()
 
-    target_file = (TARGET / "solution" / "main.py") if args.solution else (TARGET / "exercise" / "main.py")
-    spec = importlib.util.spec_from_file_location("mod", target_file)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    target = CONCEPT / ("solution" if args.solution else "exercise") / "main.py"
+    module = load(target)
 
-    fn = getattr(mod, "scan_batch_for_injections", None)
-    assert fn is not None, "scan_batch_for_injections must be defined"
+    results = module.scan_batch_for_injections()
+    assert len(results) == len(module.TEST_MATRIX), "scan every item in the matrix"
+    for item in results:
+        assert item["flagged"] == item["expected"], f"wrong verdict for {item['text']!r}"
 
-    res = fn()
-    assert len(res) >= 4, "Must scan all test matrix items"
-    assert all("flagged" in r and "expected" in r for r in res), "Results must include flagged and expected"
+    print(f"OK - flagged {sum(r['flagged'] for r in results)} injections, benign text passed")
 
-    if not args.solution:
-        assert getattr(mod, "OBSERVATION", "").strip(), "TODO(2): write observation"
-
-    print(f"✅ Prompt injection check passed ({target_file.name})!")
 
 if __name__ == "__main__":
     main()

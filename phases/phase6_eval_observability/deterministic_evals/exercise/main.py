@@ -1,16 +1,24 @@
-"""EXERCISE -- Deterministic Schema Detail Check.
+"""EXERCISE -- Deterministic Schema Check.
 
-The demo tested Flashcard schema types.
-Your twist: implement verify_study_plan_topics(plan: list[dict]) -> dict[str, bool]
-to verify that every day has a non-empty list of non-empty strings for topics.
+Practice: validate model output with plain Python, no API calls.
+Task: finish verify_study_plan_topics() so it returns True only when every day
+has a non-empty list of non-empty topic strings.
 
-Run when done:
+Check your work with:
     python phases/phase6_eval_observability/deterministic_evals/solution/check.py
 """
-# TODO(1): Implement verify_study_plan_topics(plan: list[dict]) -> dict[str, bool]
-def verify_study_plan_topics(plan: list[dict]) -> dict[str, bool]:
-    raise NotImplementedError("TODO(1): implement verify_study_plan_topics")
+
+SAMPLE_PLAN = [
+    {"subject": "Math", "topics": ["Algebra", "Calculus"]},
+    {"subject": "Biology", "topics": ["Photosynthesis"]},
+]
+
+
+def verify_study_plan_topics(plan: list[dict]) -> bool:
+    """Return True if every day has a non-empty list of non-empty strings."""
+    # TODO: check each day's "topics" is a non-empty list of non-empty strings.
+    raise NotImplementedError("verify_study_plan_topics")
+
 
 if __name__ == "__main__":
-    sample_plan = [{"subject": "Math", "topics": ["Algebra", "Calculus"], "minutes": 60}]
-    print(verify_study_plan_topics(sample_plan))
+    print(verify_study_plan_topics(SAMPLE_PLAN))

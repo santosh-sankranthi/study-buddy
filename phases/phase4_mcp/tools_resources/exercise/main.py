@@ -1,24 +1,23 @@
-"""EXERCISE -- Expose Quiz History as an MCP Resource.
+"""Practice: serve quiz history as a read-only MCP resource.
 
-The demo exposed notes://corpus.
-Your twist: expose a session quiz history resource at 'quiz://attempts/{session_id}'.
+Task: finish get_quiz_attempts() so it returns the session's attempts as JSON.
 
-Run when done:
+Check your work with:
     python phases/phase4_mcp/tools_resources/solution/check.py
 """
 import json
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+ATTEMPTS = [
+    {"question": "2 + 2", "correct": True},
+    {"question": "3 * 3", "correct": False},
+]
 
-# TODO(1): Implement get_quiz_attempts(session_id: str) -> str
-#   Return a JSON-encoded dict with {"session_id": session_id, "attempts": []}
 
 def get_quiz_attempts(session_id: str) -> str:
-    raise NotImplementedError("TODO(1): implement get_quiz_attempts")
+    """Return {"session_id": session_id, "attempts": ATTEMPTS} encoded as JSON."""
+    # TODO: json.dumps a dict with the session_id and the ATTEMPTS list.
+    raise NotImplementedError("get_quiz_attempts")
 
 
 if __name__ == "__main__":
-    res = get_quiz_attempts("session_42")
-    print("Quiz resource output:", res)
+    print(get_quiz_attempts("session_42"))
