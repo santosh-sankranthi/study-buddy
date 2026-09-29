@@ -38,7 +38,7 @@ Each step below shows the **exact diff** of `app/main.py`. Type the `+` lines in
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index 2496787..42500ba 100644
+index 2abd63f..12ea8b3 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -26,6 +26,7 @@ How to read this file
@@ -289,16 +289,18 @@ index 2496787..42500ba 100644
 
 3. **Context compaction** (`ask()`) — Long history is summarised instead of overflowing.
 
-4. **Long context** (`/measure-long-context`) — Measure latency/cost as the document grows.
+4. **Compaction on demand** (`POST /session/{id}/compact`) — Type `/compact` in the chat to summarise the session and watch the token count drop.
 
-5. **Context security** (`sanitize (Phase 2 light pass)`) — Obvious injection is stripped before it reaches the model.
+5. **Long context** (`/measure-long-context`) — Measure latency/cost as the document grows.
+
+6. **Context security** (`sanitize (Phase 2 light pass)`) — Obvious injection is stripped before it reaches the model.
 
 
 ### The exact change (`app/main.py`)
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index 42500ba..4881d12 100644
+index 12ea8b3..b271cdf 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -27,6 +27,7 @@ from __future__ import annotations
@@ -443,7 +445,7 @@ index 42500ba..4881d12 100644
      )
  
  # ────────────────────────────────────────────────────────────────────────────
-@@ -244,6 +292,70 @@ def make_study_plan(body: dict) -> list:
+@@ -244,6 +292,86 @@ def make_study_plan(body: dict) -> list:
  def list_tools() -> list:
      return TOOLS
  
@@ -476,6 +478,22 @@ index 42500ba..4881d12 100644
 +    from app.memory import clear
 +    clear(session_id)
 +    return {"cleared": True, "session_id": session_id}
++
++# ────────────────────────────────────────────────────────────────────────────
++# CONCEPT · Context compaction (on demand)  [Phase 2.3]
++# Summarise a session to fewer tokens — the /compact chat command.
++# ────────────────────────────────────────────────────────────────────────────
++
++@app.post("/session/{session_id}/compact")
++def compact_session(session_id: str, strategy: str = "halve", force: bool = True) -> dict:
++    """On-demand compaction — what the /compact chat command calls.
++
++    Summarises the session's stored history and reports the token saving, so the
++    effect is visible instead of hidden inside /ask. `force=true` compacts even a
++    short conversation (below the automatic budget) so it can be demonstrated.
++    """
++    from app.memory import compact
++    return compact(session_id, strategy=strategy, force=force)
 +
 +# ────────────────────────────────────────────────────────────────────────────
 +# CONCEPT · Long context  [Phase 2.4]
@@ -543,7 +561,7 @@ index 42500ba..4881d12 100644
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index 4881d12..275a308 100644
+index b271cdf..d4ba23f 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -51,7 +51,7 @@ from app.context import context_budget_warning, context_report
@@ -564,7 +582,7 @@ index 4881d12..275a308 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -356,6 +356,22 @@ def measure_long_context(body: dict) -> list:
+@@ -372,6 +372,22 @@ def measure_long_context(body: dict) -> list:
          })
      return results
  
@@ -612,7 +630,7 @@ index 4881d12..275a308 100644
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index 275a308..e14e3ab 100644
+index d4ba23f..3e61461 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -51,7 +51,7 @@ from app.context import context_budget_warning, context_report
@@ -633,7 +651,7 @@ index 275a308..e14e3ab 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -372,6 +372,20 @@ def agent_plan_and_execute(body: dict) -> dict:
+@@ -388,6 +388,20 @@ def agent_plan_and_execute(body: dict) -> dict:
      from app.agent import plan_and_execute
      return plan_and_execute(body.get("question", ""))
  
@@ -681,7 +699,7 @@ index 275a308..e14e3ab 100644
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index e14e3ab..19b3f03 100644
+index 3e61461..5cb5500 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -48,10 +48,11 @@ from app.prompts import build_few_shot_prompt, build_system
@@ -824,7 +842,7 @@ index e14e3ab..19b3f03 100644
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index 19b3f03..7f05de5 100644
+index 5cb5500..0b9e64a 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -28,6 +28,8 @@ from __future__ import annotations
@@ -854,7 +872,7 @@ index 19b3f03..7f05de5 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -419,6 +421,51 @@ def mcp_tools() -> list:
+@@ -435,6 +437,51 @@ def mcp_tools() -> list:
      except Exception as exc:  # noqa: BLE001
          raise HTTPException(status_code=503, detail=f"MCP server unavailable: {exc}")
  

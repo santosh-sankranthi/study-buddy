@@ -36,6 +36,7 @@ STEPS = [
              ("Context sources", "`context_report()` shows where every token goes.", "ask() + /context-report"),
              ("Memory", "Session history is reloaded each turn so it remembers.", "ask() + /session/{id}"),
              ("Context compaction", "Long history is summarised instead of overflowing.", "ask()"),
+             ("Compaction on demand", "Type `/compact` in the chat to summarise the session and watch the token count drop.", "POST /session/{id}/compact"),
              ("Long context", "Measure latency/cost as the document grows.", "/measure-long-context"),
              ("Context security", "Obvious injection is stripped before it reaches the model.", "sanitize (Phase 2 light pass)"),
          ]),

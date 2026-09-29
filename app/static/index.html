@@ -310,6 +310,13 @@
       background: var(--background); padding: 8px 8px 8px 12px;
     }
     .composer-box:focus-within { border-color: var(--border-strong); }
+    .cmd-hint { margin: 8px 2px 0; font-size: 12px; color: var(--subtle-foreground); }
+    .cmd-hint code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px; color: var(--muted-foreground);
+      background: var(--muted); border: 1px solid var(--border);
+      border-radius: 4px; padding: 1px 5px;
+    }
     #question {
       flex: 1; resize: none; border: 0; background: transparent; color: var(--foreground);
       max-height: 160px; min-height: 24px; outline: none; padding: 4px 0;
@@ -480,6 +487,10 @@
         </div>
         <div class="sr-only" id="composer-hint">Press Enter to send, Shift+Enter for a new line.</div>
       </form>
+
+      <p class="cmd-hint" data-feature="memory">
+        Type <code>/compact</code> to summarise this session, or <code>/help</code> for commands.
+      </p>
     </div>
 
     <!-- Secondary capability panels -->
@@ -852,6 +863,14 @@
       autoGrow();
       show(el.ctxWarning, false);
       show(el.apiAlert, false);
+
+      // Slash commands are handled locally and never sent to the model.
+      if (question.startsWith("/")) {
+        await handleCommand(question);
+        el.question.focus();
+        return;
+      }
+
       setBusy(true, "Thinking…");
 
       const body = {
@@ -928,6 +947,105 @@
         setBusy(false);
         el.question.focus();
       }
+    }
+
+    // ── Chat commands (/compact, /reset, /help) ─────────────────────────────
+    // Typed into the composer and handled locally. /compact calls the backend
+    // compaction endpoint so students can watch a session shrink on demand.
+    async function handleCommand(raw) {
+      const [name, ...args] = raw.slice(1).trim().split(/\s+/);
+      const cmd = (name || "").toLowerCase();
+
+      if (cmd === "help") { addCommandHelp(); return; }
+      if (cmd === "reset" || cmd === "clear") { await startNewSession(); return; }
+
+      if (cmd === "compact") {
+        if (!state.features.has("memory")) {
+          addSystemMessage("The /compact command needs v2 or later (session memory).");
+          return;
+        }
+        const sid = el.sessionId.value.trim();
+        if (!sid) {
+          addSystemMessage("Nothing to compact yet — ask a question first.");
+          return;
+        }
+        const strategy = args[0] === "keep_last2" ? "keep_last2" : "halve";
+        setBusy(true, "Compacting…");
+        try {
+          const url = "/session/" + encodeURIComponent(sid) +
+                      "/compact?strategy=" + strategy + "&force=true";
+          const res = await fetch(url, { method: "POST" });
+          const data = await res.json().catch(() => ({ detail: "HTTP " + res.status }));
+          if (!res.ok) throw new Error(data.detail || ("HTTP " + res.status));
+          addCompactionReport(data);
+          setStatus("idle", "Ready");
+        } catch (err) {
+          handleError(err.message);
+        } finally {
+          setBusy(false);
+        }
+        return;
+      }
+
+      addSystemMessage("Unknown command /" + cmd + " — type /help.");
+    }
+
+    function addCommandHelp() {
+      addSystemMessage(
+        "Commands you can type here:  " +
+        "/compact [halve|keep_last2] — summarise this session to fewer tokens  ·  " +
+        "/reset — start a new session  ·  /help — this list."
+      );
+    }
+
+    function addCompactionReport(data) {
+      removeEmptyState();
+      const msg = document.createElement("div");
+      msg.className = "msg assistant";
+
+      const head = document.createElement("div");
+      head.className = "msg-head";
+      const who = document.createElement("span");
+      who.textContent = "Study Buddy";
+      head.appendChild(who);
+
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+
+      if (!data.compacted) {
+        bubble.textContent = "Nothing to compact yet — this session is already small.";
+        msg.append(head, bubble);
+      } else {
+        const pct = Math.round((1 - data.after_tokens / data.before_tokens) * 100);
+        bubble.textContent =
+          "Compacted the session (" + data.strategy + "): " +
+          data.before_tokens.toLocaleString() + " → " + data.after_tokens.toLocaleString() +
+          " tokens (−" + pct + "%), " +
+          data.before_messages + " → " + data.after_messages + " messages.";
+        msg.append(head, bubble);
+
+        const chips = document.createElement("div");
+        chips.className = "chips";
+        ["compacted",
+         data.before_tokens + " → " + data.after_tokens + " tok",
+         "−" + pct + "%"].forEach((t) => {
+          const c = document.createElement("span");
+          c.className = "chip";
+          c.textContent = t;
+          chips.appendChild(c);
+        });
+        msg.appendChild(chips);
+
+        if (data.summary) {
+          const pre = document.createElement("div");
+          pre.textContent = data.summary;
+          msg.appendChild(buildDetails("Summary kept as memory", pre));
+        }
+      }
+
+      el.chatLog.appendChild(msg);
+      markConversation();
+      scrollToBottom();
     }
 
     // ── New session ─────────────────────────────────────────────────────────

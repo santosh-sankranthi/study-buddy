@@ -1,5 +1,5 @@
 diff --git a/app/main.py b/app/main.py
-index 4881d12..275a308 100644
+index b271cdf..d4ba23f 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -51,7 +51,7 @@ from app.context import context_budget_warning, context_report
@@ -20,7 +20,7 @@ index 4881d12..275a308 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -356,6 +356,22 @@ def measure_long_context(body: dict) -> list:
+@@ -372,6 +372,22 @@ def measure_long_context(body: dict) -> list:
          })
      return results
  

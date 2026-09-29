@@ -4,6 +4,7 @@ Grows through the phases:
   Phase 2.2 — SessionStore, get_history(), append(), clear()
   Phase 2.2 — trim_to_token_budget()
   Phase 2.3 — summarize(), compact_if_needed(), compact_keep_last2()
+  Phase 2.3 — compact() — the on-demand /compact command, with a before/after report
 """
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -11,7 +12,8 @@ Grows through the phases:
 # The model is stateless, so "memory" is just history we re-send. This module
 # stores it per session, trims it to a token budget, and summarises the oldest
 # half when it grows too long (compaction).
-# Wired into: /ask and the /session/{id} endpoints.
+# Wired into: /ask, the /session/{id} endpoints, and /session/{id}/compact
+# (the /compact chat command).
 # ──────────────────────────────────────────────────────────────────────────────
 
 from __future__ import annotations
@@ -105,14 +107,19 @@ def summarize(messages: list[dict]) -> str:
         return f"Conversation covered earlier topics: {', '.join(topics)}."
 
 
-def compact_if_needed(session_id: str, budget: int = COMPACT_BUDGET) -> bool:
+def compact_if_needed(session_id: str, budget: int = COMPACT_BUDGET,
+                      force: bool = False) -> bool:
     """Summarize the oldest half of history when over *budget*.
 
+    With ``force=True`` the budget check is skipped, so an explicit request
+    (the ``/compact`` command) can shrink a short conversation on demand.
     Returns True if compaction occurred, False otherwise.
     """
     history = _store[session_id]
-    if _total_tokens(history) <= budget:
+    if not force and _total_tokens(history) <= budget:
         return False
+    if len(history) < 2:
+        return False  # nothing worth summarising
     half      = len(history) // 2
     old, new  = history[:half], history[half:]
     summary   = summarize(old)
@@ -122,15 +129,18 @@ def compact_if_needed(session_id: str, budget: int = COMPACT_BUDGET) -> bool:
     return True
 
 
-def compact_keep_last2(session_id: str) -> bool:
+def compact_keep_last2(session_id: str, force: bool = False) -> bool:
     """Alternative compaction: system + summary of all-except-last-2 + last 2 turns.
 
     Phase 2.3 exercise twist — keeps exactly the most recent 2 messages verbatim.
-    Returns True if compaction occurred.
+    With ``force=True`` it compacts a short conversation too (used by the
+    ``/compact keep_last2`` command). Returns True if compaction occurred.
     """
     history = _store[session_id]
-    if len(history) <= 4:
+    if not force and len(history) <= 4:
         return False  # not enough to compact
+    if len(history) <= 2:
+        return False  # nothing to summarise
     to_summarize = history[:-2]
     last2        = history[-2:]
     summary      = summarize(to_summarize)
@@ -138,6 +148,50 @@ def compact_keep_last2(session_id: str) -> bool:
         {"role": "system", "content": f"[SUMMARY OF EARLIER CONVERSATION]\n{summary}"}
     ] + last2
     return True
+
+
+def compact(session_id: str, strategy: str = "halve", force: bool = False) -> dict:
+    """Compact a session on demand and return a before/after report.
+
+    This is what the ``/compact`` chat command calls: it summarises the stored
+    history, then reports how many tokens and messages were saved — the visible
+    payoff students see in the UI.
+    """
+    before        = list(_store[session_id])
+    before_tokens = _total_tokens(before)
+
+    if strategy == "keep_last2":
+        changed = compact_keep_last2(session_id, force=force)
+    else:
+        changed = compact_if_needed(session_id, force=force)
+
+    after        = _store[session_id]
+    after_tokens = _total_tokens(after)
+
+    # Compaction must actually save tokens. A 3-sentence summary of a very short
+    # conversation can be *longer* than the conversation itself, so undo it —
+    # reporting an increase would be worse than reporting "already small".
+    if changed and after_tokens >= before_tokens:
+        _store[session_id] = before
+        after        = before
+        after_tokens = before_tokens
+        changed      = False
+
+    summary = ""
+    if changed and after and after[0].get("role") == "system":
+        summary = after[0].get("content", "")
+
+    return {
+        "compacted":       changed,
+        "strategy":        strategy,
+        "forced":          force,
+        "before_messages": len(before),
+        "after_messages":  len(after),
+        "before_tokens":   before_tokens,
+        "after_tokens":    after_tokens,
+        "saved_tokens":    max(before_tokens - after_tokens, 0),
+        "summary":         summary,
+    }
 
 
 # ── Quiz history ──────────────────────────────────────────────────────────────

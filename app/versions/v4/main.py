@@ -6,7 +6,7 @@ exactly what changed and why.
 Phase progression:
   v0  — raw one-shot Q&A (the starting point)
   v1  — system prompts, CoT, structured output (/modes, /flashcards, /quiz-item, /study-plan, /tools)
-  v2  — session memory, context compaction, context report, long-context measurement
+  v2  — session memory, context compaction (/compact), context report, long-context measurement
   v3  — agents (/agent/ask, /agent/plan-and-execute)
   v4  — MCP (/mcp/tools)
   v5  — security middleware (injection, PII, moderation)
@@ -321,6 +321,22 @@ def clear_session(session_id: str) -> dict:
     from app.memory import clear
     clear(session_id)
     return {"cleared": True, "session_id": session_id}
+
+# ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · Context compaction (on demand)  [Phase 2.3]
+# Summarise a session to fewer tokens — the /compact chat command.
+# ────────────────────────────────────────────────────────────────────────────
+
+@app.post("/session/{session_id}/compact")
+def compact_session(session_id: str, strategy: str = "halve", force: bool = True) -> dict:
+    """On-demand compaction — what the /compact chat command calls.
+
+    Summarises the session's stored history and reports the token saving, so the
+    effect is visible instead of hidden inside /ask. `force=true` compacts even a
+    short conversation (below the automatic budget) so it can be demonstrated.
+    """
+    from app.memory import compact
+    return compact(session_id, strategy=strategy, force=force)
 
 # ────────────────────────────────────────────────────────────────────────────
 # CONCEPT · Long context  [Phase 2.4]

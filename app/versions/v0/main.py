@@ -6,7 +6,7 @@ exactly what changed and why.
 Phase progression:
   v0  — raw one-shot Q&A (the starting point)
   v1  — system prompts, CoT, structured output (/modes, /flashcards, /quiz-item, /study-plan, /tools)
-  v2  — session memory, context compaction, context report, long-context measurement
+  v2  — session memory, context compaction (/compact), context report, long-context measurement
   v3  — agents (/agent/ask, /agent/plan-and-execute)
   v4  — MCP (/mcp/tools)
   v5  — security middleware (injection, PII, moderation)

@@ -1,5 +1,5 @@
 diff --git a/app/main.py b/app/main.py
-index 275a308..e14e3ab 100644
+index d4ba23f..3e61461 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -51,7 +51,7 @@ from app.context import context_budget_warning, context_report
@@ -20,7 +20,7 @@ index 275a308..e14e3ab 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -372,6 +372,20 @@ def agent_plan_and_execute(body: dict) -> dict:
+@@ -388,6 +388,20 @@ def agent_plan_and_execute(body: dict) -> dict:
      from app.agent import plan_and_execute
      return plan_and_execute(body.get("question", ""))
  
