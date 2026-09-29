@@ -1,5 +1,5 @@
 diff --git a/app/main.py b/app/main.py
-index cd69095..881539e 100644
+index 4466d6d..d732b04 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -28,6 +28,8 @@ from __future__ import annotations
@@ -11,7 +11,7 @@ index cd69095..881539e 100644
  from pathlib import Path
  
  # Locate the app package by walking up from this file, so this module works
-@@ -51,7 +53,7 @@ from app.context import context_budget_warning, context_report
+@@ -52,7 +54,7 @@ from app.security import moderate, sanitize_input, scrub_pii
  
  STATIC_DIR = _APP_DIR / "static"
  
@@ -20,7 +20,7 @@ index cd69095..881539e 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · /meta — capability manifest  [all phases]
-@@ -60,7 +62,7 @@ app = FastAPI(title="Study Buddy", version="v5")
+@@ -61,7 +63,7 @@ app = FastAPI(title="Study Buddy", version="v5")
  @app.get("/meta")
  def meta() -> dict:
      """What this version supports; the frontend gates its controls on this."""
@@ -29,7 +29,7 @@ index cd69095..881539e 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -413,6 +415,51 @@ def mcp_tools() -> list:
+@@ -414,6 +416,51 @@ def mcp_tools() -> list:
      except Exception as exc:  # noqa: BLE001
          raise HTTPException(status_code=503, detail=f"MCP server unavailable: {exc}")
  
