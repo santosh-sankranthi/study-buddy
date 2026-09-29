@@ -191,6 +191,17 @@
     .field input::placeholder { color: var(--subtle-foreground); }
     .field input:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 
+    .ext-mcp { display: grid; gap: 8px; }
+    .ext-mcp .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .ext-mcp input {
+      flex: 1 1 160px; min-width: 140px; padding: 6px 9px; font-size: 13px;
+      background: var(--background); color: var(--foreground);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+    }
+    .ext-mcp input::placeholder { color: var(--subtle-foreground); }
+    .ext-mcp input:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+    .ext-mcp .hintline { margin: 0; font-size: 12px; color: var(--subtle-foreground); }
+
     /* ── Chat log ─────────────────────────────────────────────────────────── */
     .chat {
       flex: 1; overflow-y: auto; overscroll-behavior: contain;
@@ -498,8 +509,21 @@
       <details class="panel" id="mcp-panel" data-feature="mcp">
         <summary>MCP tools</summary>
         <div class="panel-body">
-          <button type="button" class="btn btn-outline btn-sm" id="mcp-btn">List tools</button>
-          <pre id="mcp-output" class="is-hidden" aria-live="polite"></pre>
+          <div class="ext-mcp">
+            <div class="row">
+              <button type="button" class="btn btn-outline btn-sm" id="mcp-btn">List local tools</button>
+              <button type="button" class="btn btn-outline btn-sm" id="mcp-ext-btn">List external tools</button>
+            </div>
+            <pre id="mcp-output" class="is-hidden" aria-live="polite"></pre>
+
+            <p class="hintline" id="mcp-ext-label">External MCP: live documentation server</p>
+            <div class="row">
+              <input id="mcp-repo" type="text" value="langchain-ai/langchain" aria-label="Documentation repo" />
+              <input id="mcp-question" type="text" placeholder="Ask the LangChain docs…" aria-label="Question for the docs" />
+              <button type="button" class="btn btn-primary btn-sm" id="mcp-ask-btn">Ask docs</button>
+            </div>
+            <pre id="mcp-ask-output" class="is-hidden" aria-live="polite"></pre>
+          </div>
         </div>
       </details>
 
@@ -544,6 +568,12 @@
       studentName:  $("student-name"),
       mcpBtn:       $("mcp-btn"),
       mcpOutput:    $("mcp-output"),
+      mcpExtBtn:    $("mcp-ext-btn"),
+      mcpAskBtn:    $("mcp-ask-btn"),
+      mcpRepo:      $("mcp-repo"),
+      mcpQuestion:  $("mcp-question"),
+      mcpAskOutput: $("mcp-ask-output"),
+      mcpExtLabel:  $("mcp-ext-label"),
       regressionBtn:$("regression-btn"),
       evalOutput:   $("eval-output"),
     };
@@ -1094,6 +1124,51 @@
       }
     }
 
+    async function runExternalMcpList() {
+      el.mcpOutput.textContent = "Connecting to the external MCP server…";
+      show(el.mcpOutput, true);
+      try {
+        const cfgRes = await fetch("/mcp/external");
+        if (cfgRes.ok) {
+          const cfg = await cfgRes.json();
+          if (cfg.label) el.mcpExtLabel.textContent = "External MCP: " + cfg.label + "  (" + cfg.url + ")";
+        }
+        const res = await fetch("/mcp/external/tools");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || ("HTTP " + res.status));
+        const lines = (Array.isArray(data) ? data : []).map((t) => {
+          const props = (t.input_schema && t.input_schema.properties) || {};
+          const args = Object.keys(props).join(", ");
+          return "• " + t.name + "(" + args + ") — " + (t.description || "").slice(0, 90);
+        });
+        el.mcpOutput.textContent = lines.join("\n") || "(no tools)";
+      } catch (err) {
+        el.mcpOutput.textContent = "Error: " + err.message;
+      }
+    }
+
+    async function runExternalMcpAsk() {
+      const question = el.mcpQuestion.value.trim();
+      if (!question) { el.mcpQuestion.focus(); return; }
+      el.mcpAskOutput.textContent = "Asking the docs server over MCP…";
+      show(el.mcpAskOutput, true);
+      try {
+        const res = await fetch("/mcp/external/ask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            repo: el.mcpRepo.value.trim() || "langchain-ai/langchain",
+            question,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || ("HTTP " + res.status));
+        el.mcpAskOutput.textContent = data.result || "(empty result)";
+      } catch (err) {
+        el.mcpAskOutput.textContent = "Error: " + err.message;
+      }
+    }
+
     async function runRegression() {
       el.evalOutput.textContent = "Running…";
       show(el.evalOutput, true);
@@ -1137,6 +1212,8 @@
       if (el.agentBtn) el.agentBtn.addEventListener("click", askAgent);
       if (el.newSessionBtn) el.newSessionBtn.addEventListener("click", startNewSession);
       if (el.mcpBtn) el.mcpBtn.addEventListener("click", runMcpList);
+      if (el.mcpExtBtn) el.mcpExtBtn.addEventListener("click", runExternalMcpList);
+      if (el.mcpAskBtn) el.mcpAskBtn.addEventListener("click", runExternalMcpAsk);
       if (el.regressionBtn) el.regressionBtn.addEventListener("click", runRegression);
 
       document.querySelectorAll(".seg").forEach((seg) => {

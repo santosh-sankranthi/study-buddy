@@ -436,6 +436,57 @@ def mcp_tools() -> list:
         raise HTTPException(status_code=503, detail=f"MCP server unavailable: {exc}")
 
 # ────────────────────────────────────────────────────────────────────────────
+# CONCEPT · External MCP (live docs)  [Phase 4]
+# Call a remote MCP server over HTTP — a live documentation server.
+# ────────────────────────────────────────────────────────────────────────────
+
+@app.get("/mcp/external")
+def mcp_external_config() -> dict:
+    """Which external docs MCP server this build talks to (set in .env)."""
+    from app.mcp_client import external_mcp_config
+    return external_mcp_config()
+
+
+@app.get("/mcp/external/tools")
+def mcp_external_tools() -> list:
+    """Discover tools on the external MCP server, live over HTTP."""
+    from app.mcp_client import external_mcp_config, list_external_tools
+    try:
+        return list_external_tools(external_mcp_config()["url"])
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail=f"External MCP server unavailable: {exc}")
+
+
+@app.post("/mcp/external/call")
+def mcp_external_call(body: dict) -> dict:
+    """Call any tool on the external MCP server and return its result."""
+    from app.mcp_client import call_external_tool, external_mcp_config
+    name = body.get("name", "")
+    args = body.get("arguments") or {}
+    try:
+        result = call_external_tool(name, args, external_mcp_config()["url"])
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail=f"External MCP call failed: {exc}")
+    return {"tool": name, "arguments": args, "result": result}
+
+
+@app.post("/mcp/external/ask")
+def mcp_external_ask(body: dict) -> dict:
+    """Ask the external docs server a question (calls its ask tool)."""
+    from app.mcp_client import call_external_tool, external_mcp_config
+    cfg      = external_mcp_config()
+    repo     = body.get("repo") or "langchain-ai/langchain"
+    question = body.get("question", "")
+    if not question.strip():
+        raise HTTPException(status_code=422, detail="question is required")
+    args = {"repoName": repo, "question": question}
+    try:
+        result = call_external_tool(cfg["ask_tool"], args, cfg["url"])
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail=f"External MCP call failed: {exc}")
+    return {"repo": repo, "question": question, "result": result}
+
+# ────────────────────────────────────────────────────────────────────────────
 # CONCEPT · Frontend  [all phases]
 # Serve the single-page UI; every phase of the workshop is driven through it.
 # ────────────────────────────────────────────────────────────────────────────

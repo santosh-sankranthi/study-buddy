@@ -237,6 +237,8 @@ study-buddy/
 | `/agent/ask` | `POST` | 3 | Autonomous ReAct agent loop with execution trace |
 | `/agent/plan-and-execute` | `POST` | 3 | Multi-agent Planner → Executor → Critic pipeline |
 | `/mcp/tools` | `GET` | 4 | Tools discovered from the MCP server over stdio |
+| `/mcp/external/tools` | `GET` | 4 | Tools on a remote MCP server (live docs), over HTTP |
+| `/mcp/external/ask` | `POST` | 4 | Ask the external docs server a question (live) |
 | `/eval/regression-report` | `GET` | 6 | Automated regression benchmark report |
 
 ## 9. Running the Model Context Protocol (MCP) Server
@@ -259,4 +261,15 @@ Configure in Claude Desktop (`~/Library/Application Support/Claude/claude_deskto
   }
 }
 ```
+
+### External MCP (v4+): live documentation
+
+The same client can also call a **remote** MCP server over HTTP, so you can show
+a real external tool being used live. By default it points at DeepWiki
+(`https://mcp.deepwiki.com/mcp`), whose `ask_wiki_question` answers questions
+about a GitHub repo's docs — no API key needed. In the UI, open the **MCP tools**
+panel → *List external tools* / *Ask docs*; e.g. repo `langchain-ai/langchain`
+and question *"What is LCEL?"*. Change the server via `.env`:
+`MCP_EXTERNAL_URL` (any MCP endpoint, e.g. Context7), `MCP_EXTERNAL_LABEL`, and
+`MCP_EXTERNAL_ASK_TOOL`.
 

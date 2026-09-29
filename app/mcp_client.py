@@ -1,13 +1,18 @@
 """Study Buddy MCP Client.
 
-Allows Study Buddy to discover and invoke tools served by any MCP server
-(such as the Study Buddy MCP server in mcp_server/server.py).
+Talks to MCP servers two ways:
+
+* **local**  — the Study Buddy server in ``mcp_server/server.py`` over stdio.
+* **external** — a remote MCP server over HTTP (e.g. a live docs server such as
+  DeepWiki), so students can watch the app fetch real documentation on the fly.
 """
 
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 # Add repo root to sys.path
@@ -56,3 +61,77 @@ def list_mcp_tools() -> list[dict]:
 def call_mcp_tool(name: str, args: dict) -> str:
     """Execute a tool call over the MCP stdio protocol."""
     return asyncio.run(_call_tool_async(name, args))
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# CONCEPT · External MCP  [Phase 4]
+# The same MCP client can point at a REMOTE server over HTTP. The default is a
+# live documentation server (DeepWiki), so the class can ask real questions
+# about the LangChain docs and watch the answer come back over MCP.
+# Override the endpoint/label/tool in .env (MCP_EXTERNAL_*).
+# ──────────────────────────────────────────────────────────────────────────────
+
+DEFAULT_EXTERNAL_MCP_URL      = "https://mcp.deepwiki.com/mcp"
+DEFAULT_EXTERNAL_MCP_LABEL    = "DeepWiki (LangChain docs)"
+DEFAULT_EXTERNAL_MCP_ASK_TOOL = "ask_wiki_question"
+
+
+def external_mcp_config() -> dict:
+    """Endpoint and metadata for the external docs MCP server."""
+    return {
+        "url":      os.getenv("MCP_EXTERNAL_URL", DEFAULT_EXTERNAL_MCP_URL),
+        "label":    os.getenv("MCP_EXTERNAL_LABEL", DEFAULT_EXTERNAL_MCP_LABEL),
+        "ask_tool": os.getenv("MCP_EXTERNAL_ASK_TOOL", DEFAULT_EXTERNAL_MCP_ASK_TOOL),
+    }
+
+
+@asynccontextmanager
+async def _external_session(url: str):
+    """Open an initialized MCP session to a remote server (streamable HTTP, else SSE)."""
+    if not HAS_MCP:
+        raise RuntimeError("The 'mcp' package is not installed")
+    from mcp import ClientSession
+
+    try:
+        from mcp.client.streamable_http import streamable_http_client as connect
+    except ImportError:  # older SDKs use SSE for remote servers
+        from mcp.client.sse import sse_client as connect
+
+    async with connect(url) as streams:
+        read, write = streams[0], streams[1]
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            yield session
+
+
+async def _list_external_tools_async(url: str) -> list[dict]:
+    async with _external_session(url) as session:
+        result = await session.list_tools()
+        tools = []
+        for tool in result.tools:
+            schema = getattr(tool, "input_schema", None) or getattr(tool, "inputSchema", None) or {}
+            tools.append({
+                "name":         tool.name,
+                "description":  tool.description or "",
+                "input_schema": schema,
+            })
+        return tools
+
+
+async def _call_external_tool_async(url: str, name: str, args: dict) -> str:
+    async with _external_session(url) as session:
+        result = await session.call_tool(name, args)
+        parts = [getattr(block, "text", "") for block in (result.content or [])]
+        return "\n".join(part for part in parts if part)
+
+
+def list_external_tools(url: str | None = None) -> list[dict]:
+    """Discover the tools served by the external MCP server (live)."""
+    return asyncio.run(_list_external_tools_async(url or external_mcp_config()["url"]))
+
+
+def call_external_tool(name: str, args: dict | None = None, url: str | None = None) -> str:
+    """Call one tool on the external MCP server and return its text result."""
+    return asyncio.run(
+        _call_external_tool_async(url or external_mcp_config()["url"], name, args or {})
+    )
