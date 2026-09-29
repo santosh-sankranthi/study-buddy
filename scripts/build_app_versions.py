@@ -118,7 +118,7 @@ def imports_for(level: int) -> str:
         ]
     if level >= 2:
         lines.append("from app.context import context_budget_warning, context_report")
-    if level >= 7:
+    if level >= 5:
         lines.append("from app.security import moderate, sanitize_input, scrub_pii")
     return "\n".join(lines)
 

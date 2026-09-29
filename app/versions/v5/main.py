@@ -48,6 +48,7 @@ from app.prompts import build_few_shot_prompt, build_system
 from app.schemas import Flashcard, QuizItem, StudyPlanDay
 from app.tools import TOOLS
 from app.context import context_budget_warning, context_report
+from app.security import moderate, sanitize_input, scrub_pii
 
 STATIC_DIR = _APP_DIR / "static"
 
