@@ -104,15 +104,11 @@ def moderate(text: str) -> dict:
     Returns:
         {"flagged": bool, "categories": {category: bool, ...}}
     """
-    from openai import OpenAI  # late import — not needed until Phase 8
+    from common.llm import client as llm_client  # provider-agnostic
 
     try:
-        api_key  = os.getenv("OPENROUTER_API_KEY", "")
-        base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
-        if not api_key:
-            raise ValueError("No API key configured")
-        client   = OpenAI(api_key=api_key, base_url=base_url)
-        result   = client.moderations.create(input=text)
+        client = llm_client()
+        result = client.moderations.create(input=text)
         cats   = result.results[0].categories
         flagged_cats = {
             k: v

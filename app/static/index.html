@@ -617,7 +617,9 @@
         const meta = await res.json();
         state.features = new Set(meta.features || []);
         state.metaLoaded = true;
-        el.ver.textContent = "Running " + (meta.version || "unknown");
+        const bits = ["Running " + (meta.version || "unknown")];
+        if (meta.provider) bits.push(meta.provider + (meta.model ? "/" + meta.model : ""));
+        el.ver.textContent = bits.join(" · ");
       } catch (err) {
         // Fail open: if /meta is unavailable, show the whole console.
         console.warn("Could not load /meta; showing all controls.", err);

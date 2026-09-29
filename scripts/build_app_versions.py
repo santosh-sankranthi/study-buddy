@@ -701,7 +701,12 @@ def meta_endpoint(level: int) -> str:
         '@app.get("/meta")\n'
         "def meta() -> dict:\n"
         '    """What this version supports; the frontend gates its controls on this."""\n'
-        f'    return {{"version": "v{level}", "features": {features_for(level)!r}}}\n'
+        "    try:\n"
+        "        from common.llm import provider_info\n"
+        "        provider = provider_info()\n"
+        "    except Exception:  # noqa: BLE001\n"
+        "        provider = {}\n"
+        f'    return {{"version": "v{level}", "features": {features_for(level)!r}, **provider}}\n'
     )
 
 

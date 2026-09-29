@@ -76,27 +76,14 @@ def react_step(messages: list[dict], trace: list[dict]) -> tuple[list[dict], boo
     Returns:
         (updated_messages, is_done, final_answer_or_empty)
     """
-    import os
-    from openai import OpenAI
-    from dotenv import load_dotenv
-    load_dotenv()
+    from common.llm import chat_raw  # provider-agnostic (OpenRouter or opencode)
 
     try:
-        client   = OpenAI(
-            api_key=os.getenv("OPENROUTER_API_KEY", ""),
-            base_url=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
-        )
-        response_obj = client.chat.completions.create(
-            model=os.getenv("OPENROUTER_MODEL", "openrouter/free"),
-            messages=messages,
-            tools=TOOLS,
-            tool_choice="auto",
-            temperature=0.0,
-        )
-        choice = response_obj.choices[0]
+        message = chat_raw(messages, tools=TOOLS, tool_choice="auto", temperature=0.0)
+        tool_calls = getattr(message, "tool_calls", None)
 
-        if choice.finish_reason == "tool_calls" and choice.message.tool_calls:
-            tool_call = choice.message.tool_calls[0]
+        if tool_calls:
+            tool_call = tool_calls[0]
             tc_dict   = {
                 "id":       tool_call.id,
                 "function": {
@@ -134,7 +121,7 @@ def react_step(messages: list[dict], trace: list[dict]) -> tuple[list[dict], boo
             return messages, False, ""
 
         # No tool call — model is done.
-        final_answer = choice.message.content or ""
+        final_answer = message.content or ""
         trace.append({
             "thought":     "I have enough information to answer.",
             "action":      "FINISH",

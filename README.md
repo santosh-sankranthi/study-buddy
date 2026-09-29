@@ -153,24 +153,38 @@ python scripts/build_git_tags.py
 
 ## 6. Model configuration
 
-`.env` controls everything:
+`.env` selects the provider and holds the keys. Two OpenAI-compatible providers
+are supported:
 
 ```
+LLM_PROVIDER=openrouter          # or: opencode
+
+# OpenRouter (the default)
 OPENROUTER_API_KEY=sk-or-...
 OPENROUTER_MODEL=openrouter/free
+
+# OpenCode Zen Go gateway
+OPENCODE_API_KEY=...
+OPENCODE_BASE_URL=https://opencode.ai/zen/go/v1
+OPENCODE_MODEL=qwen3.7-plus
 ```
+
+Whichever provider you do **not** pick is used automatically as a fallback, so a
+provider outage degrades instead of dying. All LLM calls go through
+`common/llm.py`, which retries with exponential backoff on rate limits and walks
+the model list before moving to the next provider — a rate-limit blip during
+class does not kill the demo.
 
 `openrouter/free` is a router that auto-selects a free model with whatever
 capability the call needs (tool calling, JSON, vision), so we never hardcode a
-single free model that might disappear. Free model IDs rotate; see
-<https://openrouter.ai/models> filtered by *prompt price: free* for what is
-live, and pin the current ones in `OPENROUTER_FALLBACK_MODELS` (comma separated)
-in case the router has an off day.
+single free model that might disappear. Free IDs rotate; see
+<https://openrouter.ai/models> filtered by *prompt price: free* for live ones and
+pin them in `OPENROUTER_FALLBACK_MODELS`.
 
-Free tier is roughly 20 requests/minute plus a daily cap. All LLM calls go
-through `common/llm.py`, which retries with exponential backoff on rate limits
-and falls back across the model list, so a rate-limit blip during a live class
-does not kill the demo.
+The OpenCode gateway is OpenAI-compatible but requires an `x-opencode-session`
+header, which the client sets for you (override with `OPENCODE_SESSION`). Verify
+the active provider with `python scripts/smoke_test.py`; `GET /meta` reports the
+active provider/model to the UI.
 
 ## 7. Repo layout & Curriculum Map
 

@@ -61,7 +61,12 @@ app = FastAPI(title="Study Buddy", version="v5")
 @app.get("/meta")
 def meta() -> dict:
     """What this version supports; the frontend gates its controls on this."""
-    return {"version": "v5", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp', 'security']}
+    try:
+        from common.llm import provider_info
+        provider = provider_info()
+    except Exception:  # noqa: BLE001
+        provider = {}
+    return {"version": "v5", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp', 'security'], **provider}
 
 # ────────────────────────────────────────────────────────────────────────────
 # CONCEPT · API request / response contract  [Phase 1.4]

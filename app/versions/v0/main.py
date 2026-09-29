@@ -54,7 +54,12 @@ app = FastAPI(title="Study Buddy", version="v0")
 @app.get("/meta")
 def meta() -> dict:
     """What this version supports; the frontend gates its controls on this."""
-    return {"version": "v0", "features": []}
+    try:
+        from common.llm import provider_info
+        provider = provider_info()
+    except Exception:  # noqa: BLE001
+        provider = {}
+    return {"version": "v0", "features": [], **provider}
 
 class AskRequest(BaseModel):
     question: str
