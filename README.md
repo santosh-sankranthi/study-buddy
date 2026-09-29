@@ -166,7 +166,7 @@ OPENROUTER_MODEL=openrouter/free
 # OpenCode Zen Go gateway
 OPENCODE_API_KEY=...
 OPENCODE_BASE_URL=https://opencode.ai/zen/go/v1
-OPENCODE_MODEL=qwen3.7-plus
+OPENCODE_MODEL=deepseek-v4.1-flash
 ```
 
 Whichever provider you do **not** pick is used automatically as a fallback, so a

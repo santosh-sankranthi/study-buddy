@@ -83,7 +83,7 @@ def _make_opencode() -> Provider:
         name="opencode",
         base_url=os.getenv("OPENCODE_BASE_URL", "https://opencode.ai/zen/go/v1"),
         api_key=(os.getenv("OPENCODE_API_KEY") or os.getenv("OPENAI_API_KEY", "")).strip(),
-        default_model=os.getenv("OPENCODE_MODEL", "qwen3.7-plus"),
+        default_model=os.getenv("OPENCODE_MODEL", "deepseek-v4.1-flash"),
         fallback_models=_csv_env("OPENCODE_FALLBACK_MODELS") or ["deepseek-v4-flash", "glm-5.3"],
         extra_headers={"x-opencode-session": _OPENCODE_SESSION},
     )
