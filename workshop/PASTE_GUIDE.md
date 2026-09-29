@@ -550,11 +550,13 @@ index 12ea8b3..b271cdf 100644
 
 1. **Tools + function calling** (`/agent/ask`) — Real functions in `TOOL_REGISTRY` are executed.
 
-2. **ReAct loop** (`/agent/ask`) — Think → act → observe, with a visible trace.
+2. **Persistent notes** (`app/tools.py + /agent/ask`) — `store_note` writes to `data/notes/` so saved notes survive new sessions.
 
-3. **Agent loops** (`app/agent.py`) — Stop conditions: step cap + repeat detection.
+3. **ReAct loop** (`/agent/ask`) — Think → act → observe, with a visible trace.
 
-4. **Multi-agent** (`/agent/plan-and-execute`) — Planner → executor → critic.
+4. **Agent loops** (`app/agent.py`) — Stop conditions: step cap + repeat detection.
+
+5. **Multi-agent** (`/agent/plan-and-execute`) — Planner → executor → critic.
 
 
 ### The exact change (`app/main.py`)
