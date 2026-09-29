@@ -1,5 +1,5 @@
 diff --git a/app/main.py b/app/main.py
-index d67b50f..60a93d0 100644
+index 275a308..e14e3ab 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -51,7 +51,7 @@ from app.context import context_budget_warning, context_report
@@ -11,16 +11,16 @@ index d67b50f..60a93d0 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · /meta — capability manifest  [all phases]
-@@ -60,7 +60,7 @@ app = FastAPI(title="Study Buddy", version="v3")
- @app.get("/meta")
- def meta() -> dict:
-     """What this version supports; the frontend gates its controls on this."""
--    return {"version": "v3", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents']}
-+    return {"version": "v4", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp']}
+@@ -65,7 +65,7 @@ def meta() -> dict:
+         provider = provider_info()
+     except Exception:  # noqa: BLE001
+         provider = {}
+-    return {"version": "v3", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents'], **provider}
++    return {"version": "v4", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp'], **provider}
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -367,6 +367,20 @@ def agent_plan_and_execute(body: dict) -> dict:
+@@ -372,6 +372,20 @@ def agent_plan_and_execute(body: dict) -> dict:
      from app.agent import plan_and_execute
      return plan_and_execute(body.get("question", ""))
  

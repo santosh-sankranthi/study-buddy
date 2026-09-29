@@ -1,5 +1,5 @@
 diff --git a/app/main.py b/app/main.py
-index 4466d6d..d732b04 100644
+index 19b3f03..7f05de5 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -28,6 +28,8 @@ from __future__ import annotations
@@ -20,16 +20,16 @@ index 4466d6d..d732b04 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · /meta — capability manifest  [all phases]
-@@ -61,7 +63,7 @@ app = FastAPI(title="Study Buddy", version="v5")
- @app.get("/meta")
- def meta() -> dict:
-     """What this version supports; the frontend gates its controls on this."""
--    return {"version": "v5", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp', 'security']}
-+    return {"version": "v6", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp', 'security', 'evals']}
+@@ -66,7 +68,7 @@ def meta() -> dict:
+         provider = provider_info()
+     except Exception:  # noqa: BLE001
+         provider = {}
+-    return {"version": "v5", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp', 'security'], **provider}
++    return {"version": "v6", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp', 'security', 'evals'], **provider}
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -414,6 +416,51 @@ def mcp_tools() -> list:
+@@ -419,6 +421,51 @@ def mcp_tools() -> list:
      except Exception as exc:  # noqa: BLE001
          raise HTTPException(status_code=503, detail=f"MCP server unavailable: {exc}")
  

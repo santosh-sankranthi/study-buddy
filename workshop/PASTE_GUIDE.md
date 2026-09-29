@@ -38,7 +38,7 @@ Each step below shows the **exact diff** of `app/main.py`. Type the `+` lines in
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index 511041e..f9b0403 100644
+index 2496787..42500ba 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -26,6 +26,7 @@ How to read this file
@@ -73,12 +73,12 @@ index 511041e..f9b0403 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · /meta — capability manifest  [all phases]
-@@ -54,14 +58,26 @@ app = FastAPI(title="Study Buddy", version="v0")
- @app.get("/meta")
- def meta() -> dict:
-     """What this version supports; the frontend gates its controls on this."""
--    return {"version": "v0", "features": []}
-+    return {"version": "v1", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema']}
+@@ -59,14 +63,26 @@ def meta() -> dict:
+         provider = provider_info()
+     except Exception:  # noqa: BLE001
+         provider = {}
+-    return {"version": "v0", "features": [], **provider}
++    return {"version": "v1", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema'], **provider}
 +
 +# ────────────────────────────────────────────────────────────────────────────
 +# CONCEPT · API request / response contract  [Phase 1.4]
@@ -103,7 +103,7 @@ index 511041e..f9b0403 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · /ask — the core endpoint  [Phase 0-6]
-@@ -70,12 +86,158 @@ class AskResponse(BaseModel):
+@@ -75,12 +91,158 @@ class AskResponse(BaseModel):
  
  @app.post("/ask", response_model=AskResponse)
  def ask(request: AskRequest) -> AskResponse:
@@ -298,7 +298,7 @@ index 511041e..f9b0403 100644
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index f9b0403..05ac079 100644
+index 42500ba..4881d12 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -27,6 +27,7 @@ from __future__ import annotations
@@ -322,16 +322,16 @@ index f9b0403..05ac079 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · /meta — capability manifest  [all phases]
-@@ -58,7 +60,7 @@ app = FastAPI(title="Study Buddy", version="v1")
- @app.get("/meta")
- def meta() -> dict:
-     """What this version supports; the frontend gates its controls on this."""
--    return {"version": "v1", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema']}
-+    return {"version": "v2", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context']}
+@@ -63,7 +65,7 @@ def meta() -> dict:
+         provider = provider_info()
+     except Exception:  # noqa: BLE001
+         provider = {}
+-    return {"version": "v1", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema'], **provider}
++    return {"version": "v2", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context'], **provider}
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -66,18 +68,25 @@ def meta() -> dict:
+@@ -71,18 +73,25 @@ def meta() -> dict:
  # ────────────────────────────────────────────────────────────────────────────
  
  class AskRequest(BaseModel):
@@ -366,7 +366,7 @@ index f9b0403..05ac079 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · /ask — the core endpoint  [Phase 0-6]
-@@ -87,13 +96,36 @@ class AskResponse(BaseModel):
+@@ -92,13 +101,36 @@ class AskResponse(BaseModel):
  @app.post("/ask", response_model=AskResponse)
  def ask(request: AskRequest) -> AskResponse:
      """Send a question to Study Buddy. Behaviour grows phase by phase."""
@@ -405,7 +405,7 @@ index f9b0403..05ac079 100644
      user_content = request.question
      if request.cot:
          user_content += (
-@@ -103,8 +135,15 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -108,8 +140,15 @@ def ask(request: AskRequest) -> AskResponse:
          )
      messages.append({"role": "user", "content": user_content})
  
@@ -421,7 +421,7 @@ index f9b0403..05ac079 100644
      thinking: str | None = None
      final_answer = raw_answer
      if request.cot:
-@@ -115,11 +154,20 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -120,11 +159,20 @@ def ask(request: AskRequest) -> AskResponse:
          if a_match:
              final_answer = a_match.group(1).strip()
  
@@ -443,7 +443,7 @@ index f9b0403..05ac079 100644
      )
  
  # ────────────────────────────────────────────────────────────────────────────
-@@ -239,6 +287,70 @@ def make_study_plan(body: dict) -> list:
+@@ -244,6 +292,70 @@ def make_study_plan(body: dict) -> list:
  def list_tools() -> list:
      return TOOLS
  
@@ -543,7 +543,7 @@ index f9b0403..05ac079 100644
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index 05ac079..d67b50f 100644
+index 4881d12..275a308 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -51,7 +51,7 @@ from app.context import context_budget_warning, context_report
@@ -555,16 +555,16 @@ index 05ac079..d67b50f 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · /meta — capability manifest  [all phases]
-@@ -60,7 +60,7 @@ app = FastAPI(title="Study Buddy", version="v2")
- @app.get("/meta")
- def meta() -> dict:
-     """What this version supports; the frontend gates its controls on this."""
--    return {"version": "v2", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context']}
-+    return {"version": "v3", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents']}
+@@ -65,7 +65,7 @@ def meta() -> dict:
+         provider = provider_info()
+     except Exception:  # noqa: BLE001
+         provider = {}
+-    return {"version": "v2", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context'], **provider}
++    return {"version": "v3", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents'], **provider}
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -351,6 +351,22 @@ def measure_long_context(body: dict) -> list:
+@@ -356,6 +356,22 @@ def measure_long_context(body: dict) -> list:
          })
      return results
  
@@ -612,7 +612,7 @@ index 05ac079..d67b50f 100644
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index d67b50f..60a93d0 100644
+index 275a308..e14e3ab 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -51,7 +51,7 @@ from app.context import context_budget_warning, context_report
@@ -624,16 +624,16 @@ index d67b50f..60a93d0 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · /meta — capability manifest  [all phases]
-@@ -60,7 +60,7 @@ app = FastAPI(title="Study Buddy", version="v3")
- @app.get("/meta")
- def meta() -> dict:
-     """What this version supports; the frontend gates its controls on this."""
--    return {"version": "v3", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents']}
-+    return {"version": "v4", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp']}
+@@ -65,7 +65,7 @@ def meta() -> dict:
+         provider = provider_info()
+     except Exception:  # noqa: BLE001
+         provider = {}
+-    return {"version": "v3", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents'], **provider}
++    return {"version": "v4", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp'], **provider}
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -367,6 +367,20 @@ def agent_plan_and_execute(body: dict) -> dict:
+@@ -372,6 +372,20 @@ def agent_plan_and_execute(body: dict) -> dict:
      from app.agent import plan_and_execute
      return plan_and_execute(body.get("question", ""))
  
@@ -681,7 +681,7 @@ index d67b50f..60a93d0 100644
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index 60a93d0..4466d6d 100644
+index e14e3ab..19b3f03 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -48,10 +48,11 @@ from app.prompts import build_few_shot_prompt, build_system
@@ -697,16 +697,16 @@ index 60a93d0..4466d6d 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · /meta — capability manifest  [all phases]
-@@ -60,7 +61,7 @@ app = FastAPI(title="Study Buddy", version="v4")
- @app.get("/meta")
- def meta() -> dict:
-     """What this version supports; the frontend gates its controls on this."""
--    return {"version": "v4", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp']}
-+    return {"version": "v5", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp', 'security']}
+@@ -65,7 +66,7 @@ def meta() -> dict:
+         provider = provider_info()
+     except Exception:  # noqa: BLE001
+         provider = {}
+-    return {"version": "v4", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp'], **provider}
++    return {"version": "v5", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp', 'security'], **provider}
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -77,16 +78,20 @@ class AskRequest(BaseModel):
+@@ -82,16 +83,20 @@ class AskRequest(BaseModel):
      student_name:     str | None = None
      study_goal:       str | None = None
      compact_strategy: str        = "halve"   # "halve" | "keep_last2"
@@ -734,7 +734,7 @@ index 60a93d0..4466d6d 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · /ask — the core endpoint  [Phase 0-6]
-@@ -97,6 +102,25 @@ class AskResponse(BaseModel):
+@@ -102,6 +107,25 @@ class AskResponse(BaseModel):
  def ask(request: AskRequest) -> AskResponse:
      """Send a question to Study Buddy. Behaviour grows phase by phase."""
  
@@ -760,7 +760,7 @@ index 60a93d0..4466d6d 100644
      # ── CONCEPT · Memory [Phase 2.2] ─────────────────────────────────────────
      # Reload earlier turns so the tutor remembers. Compaction shrinks long history.
      compacted = False
-@@ -126,7 +150,7 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -131,7 +155,7 @@ def ask(request: AskRequest) -> AskResponse:
  
      # ── CONCEPT · Chain of thought [Phase 1.3] ───────────────────────────────
      # Ask the model to reason step by step, tagged so we can split it out later.
@@ -769,7 +769,7 @@ index 60a93d0..4466d6d 100644
      if request.cot:
          user_content += (
              "\n\nThink step by step before answering. "
-@@ -143,6 +167,12 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -148,6 +172,12 @@ def ask(request: AskRequest) -> AskResponse:
      # ── The model call itself (the one thing v0 already did) ─────────────────
      raw_answer = chat(messages, temperature=request.temperature, top_p=request.top_p)
  
@@ -782,7 +782,7 @@ index 60a93d0..4466d6d 100644
      # ── CONCEPT · Chain of thought — separate reasoning from the answer ──────
      thinking: str | None = None
      final_answer = raw_answer
-@@ -156,7 +186,7 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -161,7 +191,7 @@ def ask(request: AskRequest) -> AskResponse:
  
      # ── CONCEPT · Memory — store this turn so the next one remembers it ──────
      if request.session_id:
@@ -791,7 +791,7 @@ index 60a93d0..4466d6d 100644
          append(request.session_id, "assistant", final_answer)
  
      input_tokens = count_tokens(" ".join(m.get("content") or "" for m in messages))
-@@ -167,6 +197,9 @@ def ask(request: AskRequest) -> AskResponse:
+@@ -172,6 +202,9 @@ def ask(request: AskRequest) -> AskResponse:
          output_tokens=count_tokens(final_answer),
          context_report=ctx_report,
          context_warning=ctx_warning,
@@ -824,7 +824,7 @@ index 60a93d0..4466d6d 100644
 
 ```diff
 diff --git a/app/main.py b/app/main.py
-index 4466d6d..d732b04 100644
+index 19b3f03..7f05de5 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -28,6 +28,8 @@ from __future__ import annotations
@@ -845,16 +845,16 @@ index 4466d6d..d732b04 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · /meta — capability manifest  [all phases]
-@@ -61,7 +63,7 @@ app = FastAPI(title="Study Buddy", version="v5")
- @app.get("/meta")
- def meta() -> dict:
-     """What this version supports; the frontend gates its controls on this."""
--    return {"version": "v5", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp', 'security']}
-+    return {"version": "v6", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp', 'security', 'evals']}
+@@ -66,7 +68,7 @@ def meta() -> dict:
+         provider = provider_info()
+     except Exception:  # noqa: BLE001
+         provider = {}
+-    return {"version": "v5", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp', 'security'], **provider}
++    return {"version": "v6", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp', 'security', 'evals'], **provider}
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · API request / response contract  [Phase 1.4]
-@@ -414,6 +416,51 @@ def mcp_tools() -> list:
+@@ -419,6 +421,51 @@ def mcp_tools() -> list:
      except Exception as exc:  # noqa: BLE001
          raise HTTPException(status_code=503, detail=f"MCP server unavailable: {exc}")
  

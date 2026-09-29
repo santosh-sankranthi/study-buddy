@@ -1,5 +1,5 @@
 diff --git a/app/main.py b/app/main.py
-index 511041e..f9b0403 100644
+index 2496787..42500ba 100644
 --- a/app/main.py
 +++ b/app/main.py
 @@ -26,6 +26,7 @@ How to read this file
@@ -34,12 +34,12 @@ index 511041e..f9b0403 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · /meta — capability manifest  [all phases]
-@@ -54,14 +58,26 @@ app = FastAPI(title="Study Buddy", version="v0")
- @app.get("/meta")
- def meta() -> dict:
-     """What this version supports; the frontend gates its controls on this."""
--    return {"version": "v0", "features": []}
-+    return {"version": "v1", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema']}
+@@ -59,14 +63,26 @@ def meta() -> dict:
+         provider = provider_info()
+     except Exception:  # noqa: BLE001
+         provider = {}
+-    return {"version": "v0", "features": [], **provider}
++    return {"version": "v1", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema'], **provider}
 +
 +# ────────────────────────────────────────────────────────────────────────────
 +# CONCEPT · API request / response contract  [Phase 1.4]
@@ -64,7 +64,7 @@ index 511041e..f9b0403 100644
  
  # ────────────────────────────────────────────────────────────────────────────
  # CONCEPT · /ask — the core endpoint  [Phase 0-6]
-@@ -70,12 +86,158 @@ class AskResponse(BaseModel):
+@@ -75,12 +91,158 @@ class AskResponse(BaseModel):
  
  @app.post("/ask", response_model=AskResponse)
  def ask(request: AskRequest) -> AskResponse:
