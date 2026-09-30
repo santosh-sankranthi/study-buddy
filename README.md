@@ -18,8 +18,7 @@ The product itself grows every phase. The version ladder is:
 | `v2` | Phase 2 — multi-turn memory + context compaction |
 | `v3` | Phase 3 — agents (tools + loops) |
 | `v4` | Phase 4 — MCP |
-| `v5` | Phase 5 — AI safety |
-| `v6` | Phase 6 — evaluation + observability |
+
 
 > Phases 5 (safety) and 6 (evaluation) have been moved out of the main flow. Their
 > teaching material is preserved in `archive/`; the app milestones `v5`/`v6` still exist.
