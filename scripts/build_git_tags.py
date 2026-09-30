@@ -43,6 +43,8 @@ BEATS = ("exercise", "demo", "solution")
 
 # Canonical teaching order. Any concept directory not listed is appended at the
 # end of its phase (so the extra generated concepts still get coherent tags).
+# Phases 0-4 are the main flow; phases 5 (safety) and 6 (evaluation) were moved
+# to archive/ and are no longer tagged.
 CONCEPT_ORDER: dict[int, list[str]] = {
     0: ["tokens", "context_window", "training_vs_inference", "sampling"],
     1: ["system_prompts", "few_shot_zero_shot", "cot", "structured_output",
@@ -52,15 +54,12 @@ CONCEPT_ORDER: dict[int, list[str]] = {
     3: ["tools", "function_calling_live", "react_loop", "agent_loops",
         "agent_safety", "multi_agent"],
     4: ["servers", "tools_resources", "clients", "hosts"],
-    5: ["prompt_injection", "privacy", "bias", "moderation", "adversarial_testing"],
-    6: ["deterministic_evals", "model_based_evals", "human_evals",
-        "metrics_regression", "tracing", "production_monitoring"],
 }
 
 # Phase -> app milestone used by that phase's concept tags.
 # Phases 1 and 2 land at the same milestone as their number; phase 3 is the
-# agents milestone, 4 MCP, 5 safety, 6 evaluation.
-PHASE_VERSION = {0: "v0", 1: "v1", 2: "v2", 3: "v3", 4: "v4", 5: "v5", 6: "v6"}
+# agents milestone, 4 MCP. (Phases 5/6 are archived.)
+PHASE_VERSION = {0: "v0", 1: "v1", 2: "v2", 3: "v3", 4: "v4"}
 
 
 def git(*args: str, index: str | None = None, check: bool = True) -> str:

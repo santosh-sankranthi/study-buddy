@@ -21,6 +21,9 @@ The product itself grows every phase. The version ladder is:
 | `v5` | Phase 5 — AI safety |
 | `v6` | Phase 6 — evaluation + observability |
 
+> Phases 5 (safety) and 6 (evaluation) have been moved out of the main flow. Their
+> teaching material is preserved in `archive/`; the app milestones `v5`/`v6` still exist.
+
 Do not look at `v6` first. The whole point is that each capability is a *fix*
 for something that visibly breaks in the version before it.
 
@@ -204,18 +207,19 @@ study-buddy/
 │   └── static/          # Single-file HTML/CSS/JS interactive frontend
 ├── common/              # Shared client: llm.chat() + token counting
 ├── data/sample_notes/   # 13 sample study notes (used by the search_notes tool)
-├── archive/rag/         # Parked retrieval stack (embeddings/vector DB/RAG) — not built
+├── archive/             # Parked material — preserved, not part of the main flow
+│   ├── rag/             #   retrieval stack (embeddings/vector DB/RAG)
+│   ├── phase5_safety/   #   Phase 5 — AI safety concepts
+│   └── phase6_eval_observability/  # Phase 6 — evaluation concepts
 ├── mcp_server/          # Standard Model Context Protocol (MCP) server
 ├── scripts/             # smoke_test.py, switch_version.py, build_* helpers
-├── instructor_guides/   # Detailed pedagogical guides & timing for Phases 0–6
+├── instructor_guides/   # Detailed pedagogical guides & timing for Phases 0–4
 └── phases/
     ├── phase0_fundamentals/       (tokens, context_window, training_vs_inference, sampling)
     ├── phase1_prompt_engineering/ (system_prompts, few_shot_zero_shot, cot, structured_output, function_calling_concept, react_concept)
     ├── phase2_context_engineering/ (context_sources, memory, context_compaction, long_context, context_security, mcp_concept)
     ├── phase3_agents_and_tools/    (tools, function_calling_live, react_loop, agent_loops, agent_safety, multi_agent)
-    ├── phase4_mcp/                 (servers, tools_resources, clients, hosts)
-    ├── phase5_safety/              (prompt_injection, privacy, bias, moderation, adversarial_testing)
-    └── phase6_eval_observability/  (deterministic_evals, model_based_evals, human_evals, metrics_regression, tracing, production_monitoring)
+    └── phase4_mcp/                 (servers, tools_resources, clients, hosts)
 ```
 
 ## 8. Available API Endpoints
