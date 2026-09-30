@@ -28,8 +28,6 @@ from __future__ import annotations
 import sys
 import re
 import time
-import json
-import urllib.request
 from pathlib import Path
 
 # Locate the app package by walking up from this file, so this module works
@@ -50,11 +48,10 @@ from app.prompts import build_few_shot_prompt, build_system
 from app.schemas import Flashcard, QuizItem, StudyPlanDay
 from app.tools import TOOLS
 from app.context import context_budget_warning, context_report
-from app.security import moderate, sanitize_input, scrub_pii
 
 STATIC_DIR = _APP_DIR / "static"
 
-app = FastAPI(title="Study Buddy", version="v6")
+app = FastAPI(title="Study Buddy", version="v2")
 
 # ────────────────────────────────────────────────────────────────────────────
 # CONCEPT · /meta — capability manifest  [all phases]
@@ -68,7 +65,7 @@ def meta() -> dict:
         provider = provider_info()
     except Exception:  # noqa: BLE001
         provider = {}
-    return {"version": "v6", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp', 'security', 'evals'], **provider}
+    return {"version": "v2", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context'], **provider}
 
 # ────────────────────────────────────────────────────────────────────────────
 # CONCEPT · API request / response contract  [Phase 1.4]
@@ -85,20 +82,16 @@ class AskRequest(BaseModel):
     student_name:     str | None = None
     study_goal:       str | None = None
     compact_strategy: str        = "halve"   # "halve" | "keep_last2"
-    enable_security:  bool       = True      # Phase 5+
 
 
 class AskResponse(BaseModel):
-    answer:             str
-    thinking:           str | None = None
-    input_tokens:       int = 0
-    output_tokens:      int = 0
-    context_report:     dict = {}
-    context_warning:    str | None = None
-    injection_detected: bool = False
-    pii_detected:       bool = False
-    pii_types:          list[str] = []
-    compacted:          bool = False
+    answer:          str
+    thinking:        str | None = None
+    input_tokens:    int = 0
+    output_tokens:   int = 0
+    context_report:  dict = {}
+    context_warning: str | None = None
+    compacted:       bool = False
 
 # ────────────────────────────────────────────────────────────────────────────
 # CONCEPT · /ask — the core endpoint  [Phase 0-6]
@@ -108,25 +101,6 @@ class AskResponse(BaseModel):
 @app.post("/ask", response_model=AskResponse)
 def ask(request: AskRequest) -> AskResponse:
     """Send a question to Study Buddy. Behaviour grows phase by phase."""
-
-    # ── CONCEPT · Prompt injection + PII [Phase 5] ───────────────────────────
-    # Strip injected instructions and redact personal data before anything runs.
-    question           = request.question
-    injection_detected = False
-    pii_detected       = False
-    pii_types: list[str] = []
-
-    if request.enable_security:
-        question, injection_detected = sanitize_input(question)
-        question, pii_types          = scrub_pii(question)
-        pii_detected                 = bool(pii_types)
-
-        input_mod = moderate(question)
-        if input_mod.get("flagged"):
-            raise HTTPException(
-                status_code=422,
-                detail=f"Request blocked by content policy. Categories: {input_mod.get('categories', {})}",
-            )
 
     # ── CONCEPT · Memory [Phase 2.2] ─────────────────────────────────────────
     # Reload earlier turns so the tutor remembers. Compaction shrinks long history.
@@ -157,7 +131,7 @@ def ask(request: AskRequest) -> AskResponse:
 
     # ── CONCEPT · Chain of thought [Phase 1.3] ───────────────────────────────
     # Ask the model to reason step by step, tagged so we can split it out later.
-    user_content = question
+    user_content = request.question
     if request.cot:
         user_content += (
             "\n\nThink step by step before answering. "
@@ -174,12 +148,6 @@ def ask(request: AskRequest) -> AskResponse:
     # ── The model call itself (the one thing v0 already did) ─────────────────
     raw_answer = chat(messages, temperature=request.temperature, top_p=request.top_p)
 
-    # ── CONCEPT · Moderation [Phase 5] — check the model's output too ────────
-    if request.enable_security:
-        out_mod = moderate(raw_answer)
-        if out_mod.get("flagged"):
-            raw_answer = "[Response blocked by content policy.]"
-
     # ── CONCEPT · Chain of thought — separate reasoning from the answer ──────
     thinking: str | None = None
     final_answer = raw_answer
@@ -193,7 +161,7 @@ def ask(request: AskRequest) -> AskResponse:
 
     # ── CONCEPT · Memory — store this turn so the next one remembers it ──────
     if request.session_id:
-        append(request.session_id, "user", question)
+        append(request.session_id, "user", request.question)
         append(request.session_id, "assistant", final_answer)
 
     input_tokens = count_tokens(" ".join(m.get("content") or "" for m in messages))
@@ -204,9 +172,6 @@ def ask(request: AskRequest) -> AskResponse:
         output_tokens=count_tokens(final_answer),
         context_report=ctx_report,
         context_warning=ctx_warning,
-        injection_detected=injection_detected,
-        pii_detected=pii_detected,
-        pii_types=pii_types,
         compacted=compacted,
     )
 
@@ -406,132 +371,6 @@ def measure_long_context(body: dict) -> list:
             "est_cost_usd":  round(actual_tokens / 1_000_000 * PRICE_PER_M_TOKENS, 6),
         })
     return results
-
-# ────────────────────────────────────────────────────────────────────────────
-# CONCEPT · Agents  [Phase 3]
-# A ReAct loop that calls tools, plus a planner->executor->critic pipeline.
-# ────────────────────────────────────────────────────────────────────────────
-
-@app.post("/agent/ask")
-def agent_ask(body: dict) -> dict:
-    from app.agent import agent_loop
-    return agent_loop(body.get("question", ""))
-
-
-@app.post("/agent/plan-and-execute")
-def agent_plan_and_execute(body: dict) -> dict:
-    from app.agent import plan_and_execute
-    return plan_and_execute(body.get("question", ""))
-
-# ────────────────────────────────────────────────────────────────────────────
-# CONCEPT · MCP  [Phase 4]
-# List tools discovered from the MCP server over stdio.
-# ────────────────────────────────────────────────────────────────────────────
-
-@app.get("/mcp/tools")
-def mcp_tools() -> list:
-    """List tools discovered from the Study Buddy MCP server (Phase 7)."""
-    from app.mcp_client import list_mcp_tools
-    try:
-        return list_mcp_tools()
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=503, detail=f"MCP server unavailable: {exc}")
-
-# ────────────────────────────────────────────────────────────────────────────
-# CONCEPT · External MCP (live docs)  [Phase 4]
-# Call a remote MCP server over HTTP — a live documentation server.
-# ────────────────────────────────────────────────────────────────────────────
-
-@app.get("/mcp/external")
-def mcp_external_config() -> dict:
-    """Which external docs MCP server this build talks to (set in .env)."""
-    from app.mcp_client import external_mcp_config
-    return external_mcp_config()
-
-
-@app.get("/mcp/external/tools")
-def mcp_external_tools() -> list:
-    """Discover tools on the external MCP server, live over HTTP."""
-    from app.mcp_client import external_mcp_config, list_external_tools
-    try:
-        return list_external_tools(external_mcp_config()["url"])
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=503, detail=f"External MCP server unavailable: {exc}")
-
-
-@app.post("/mcp/external/call")
-def mcp_external_call(body: dict) -> dict:
-    """Call any tool on the external MCP server and return its result."""
-    from app.mcp_client import call_external_tool, external_mcp_config
-    name = body.get("name", "")
-    args = body.get("arguments") or {}
-    try:
-        result = call_external_tool(name, args, external_mcp_config()["url"])
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=503, detail=f"External MCP call failed: {exc}")
-    return {"tool": name, "arguments": args, "result": result}
-
-
-@app.post("/mcp/external/ask")
-def mcp_external_ask(body: dict) -> dict:
-    """Ask the external docs server a question (calls its ask tool)."""
-    from app.mcp_client import call_external_tool, external_mcp_config
-    cfg      = external_mcp_config()
-    repo     = body.get("repo") or "langchain-ai/langchain"
-    question = body.get("question", "")
-    if not question.strip():
-        raise HTTPException(status_code=422, detail="question is required")
-    args = {"repoName": repo, "question": question}
-    try:
-        result = call_external_tool(cfg["ask_tool"], args, cfg["url"])
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=503, detail=f"External MCP call failed: {exc}")
-    return {"repo": repo, "question": question, "result": result}
-
-# ────────────────────────────────────────────────────────────────────────────
-# CONCEPT · Regression testing  [Phase 6]
-# Run a built-in eval set against the running app.
-# ────────────────────────────────────────────────────────────────────────────
-
-EVAL_SET = [
-    {"question": "What is photosynthesis?",              "check": lambda r: "light" in r.lower() or "energy" in r.lower()},
-    {"question": "Where does photosynthesis occur?",     "check": lambda r: "chloro" in r.lower()},
-    {"question": "What gas does photosynthesis release?", "check": lambda r: "oxygen" in r.lower() or "o2" in r.lower()},
-    {"question": "What is Newton's second law?",         "check": lambda r: "f" in r.lower() and "m" in r.lower()},
-    {"question": "What is cellular respiration?",        "check": lambda r: "energy" in r.lower() or "atp" in r.lower()},
-]
-
-
-@app.get("/eval/regression-report")
-def regression_report() -> dict:
-    """Run a mini built-in eval set against a locally running server."""
-    passed  = 0
-    results = []
-    for case in EVAL_SET:
-        try:
-            payload = json.dumps({
-                "question": case["question"],
-                "mode":     "direct",
-            }).encode()
-            req = urllib.request.Request(
-                "http://localhost:8000/ask",
-                data=payload,
-                headers={"Content-Type": "application/json"},
-            )
-            with urllib.request.urlopen(req, timeout=15) as resp:  # noqa: S310
-                answer = json.loads(resp.read()).get("answer", "")
-            ok = case["check"](answer)
-            passed += int(ok)
-            results.append({"question": case["question"], "passed": ok})
-        except Exception as exc:  # noqa: BLE001
-            results.append({"question": case["question"], "passed": False, "error": str(exc)})
-
-    return {
-        "total":     len(EVAL_SET),
-        "passed":    passed,
-        "pass_rate": round(passed / len(EVAL_SET), 3),
-        "details":   results,
-    }
 
 # ────────────────────────────────────────────────────────────────────────────
 # CONCEPT · Frontend  [all phases]
