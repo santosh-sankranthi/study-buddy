@@ -30,7 +30,8 @@ for something that visibly breaks in the version before it.
 ## 1. Prerequisites
 
 - Python 3.11+ (3.12 recommended) and a virtualenv.
-- An [OpenRouter](https://openrouter.ai) API key — free tier, no card required.
+- An API key for **one** provider: [OpenRouter](https://openrouter.ai) (free tier,
+  no card) or the OpenCode Zen Go gateway. See §6.
 - Git (the workshop is driven with `git checkout` and `git diff` between tags).
 
 ## 2. Setup
@@ -41,7 +42,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 cp .env.example .env
-# edit .env and paste your key: OPENROUTER_API_KEY=sk-or-...
+# edit .env: set LLM_PROVIDER and paste that provider's key (see §6)
 ```
 
 ### Verify the key works before anything else
@@ -50,8 +51,8 @@ cp .env.example .env
 python scripts/smoke_test.py
 ```
 
-That script sends one message to OpenRouter and prints the reply. If it fails,
-nothing downstream will work — fix it first.
+That script sends one message to the active provider and prints the reply. If it
+fails, nothing downstream will work — fix it first.
 
 ## 3. Run the app
 
@@ -62,6 +63,15 @@ uvicorn app.main:app --reload
 
 The frontend is one static HTML file (`app/static/index.html`) that `fetch()`es
 the FastAPI backend. No build step, no framework — on purpose.
+
+Once you are on a richer version you can, from the chat box:
+
+- pick a persona / mode and turn on chain-of-thought or structured output (v1+),
+- keep a multi-turn conversation, and type `/compact` to summarise the session
+  on demand (v2+),
+- ask the **Agent** to use tools, including `store_note` / `get_note` /
+  `list_notes` — saved notes land in `data/notes/` and survive a new session (v3+),
+- list and call an **external MCP** docs server live (v4+).
 
 `app/main.py` is the live app and is always at the final product (v6). To teach
 an earlier phase by showing the *pre-fix* app, switch a milestone into place and
@@ -127,32 +137,80 @@ that makes a live LLM call, so it is fast, free and safe to run repeatedly.
 
 ## 5. How the git tagging works
 
-Each concept is committed three times, so the instructor can `git diff` any two
-tags live and the diff *is* the lesson:
+The repo is taught from **tags** (frozen snapshots), not branches. There are two
+families:
 
 ```bash
-git tag                                   # list everything
-git diff p1-system-prompts-exercise p1-system-prompts-solution
+git tag -l 'v*'      # v0 v1 v2 v3 v4 v5 v6   — the app at each phase
+git tag -l 'p*'      # p<phase>-<concept>-<beat> — each concept's three beats
 ```
 
-- `p<phase>-<concept>-exercise` — the skeleton students check out to start.
-- `p<phase>-<concept>-demo`     — the instructor's live-coded demo, added on top.
-- `p<phase>-<concept>-solution` — the reference solution, added on top.
+- **Version tags `v0`…`v6`** — each points at a tree whose `app/main.py` is that
+  phase's milestone, so `git checkout v3` gives the working agents app.
+- **Concept tags `p<phase>-<concept>-<beat>`** — one per concept, committed three
+  times so the instructor can `git diff` any two and the diff *is* the lesson:
+  - `p<phase>-<concept>-exercise` — the skeleton students check out to start.
+  - `p<phase>-<concept>-demo`     — the instructor's live-coded demo, added on top.
+  - `p<phase>-<concept>-solution` — the reference solution, added on top.
 
-The `exercise` tag hides that concept's `demo/` and `solution/` (and all later
-concepts entirely), so the repo is genuinely progressive: checking out
-`p3-tools-exercise` gives you Phases 0–2 finished and Phase 3 up to the
-skeleton you are about to fill in.
+  The `exercise` tag hides that concept's `demo/` and `solution/` (and all later
+  concepts entirely), so the repo is genuinely progressive: checking out
+  `p3-react_loop-exercise` gives you Phases 0–2 finished and Phase 3 up to the
+  skeleton you are about to fill in. (Phases 5–6 are archived, so only `p0`…`p4`
+  concept tags exist.)
 
-Phase end states are tagged `v0`, `v1`, … `v6`; each points at a tree whose
-`app/main.py` is that phase's milestone, so `git checkout v3` gives the working
-agents app described above.
+### Getting around with tags
+
+A tag is a place you *visit* to look; a branch is where you *work*. You do **not**
+switch branches to move through the phases.
+
+| I want to… | Command |
+|---|---|
+| List the phases | `git tag -l 'v*'` |
+| Visit a phase's app | `git checkout v0` … `git checkout v4` |
+| Go back to newest | `git switch main` (or `git switch -`) |
+| See what a phase added | `git diff v1 v2` (add `-- app/main.py` for just the app) |
+| Peek at a concept's answer **without moving** | `git show p3-react_loop-solution:phases/phase3_agents_and_tools/react_loop/solution/main.py` |
+
+At a `vN` tag `app/main.py` already *is* that version, so `uvicorn app.main:app`
+runs it — no `switch_version.py` needed (that helper is only for previewing an
+old milestone while you sit on `main`).
+
+> **Detached HEAD:** `git checkout v2` is read-only — perfect for teaching, but
+> edits made there are not saved on any branch. If a student needs to keep work,
+> start from a branch instead: `git switch -c work v0`.
+
+### Two ways to run the class
+
+**A. View-the-ladder (simplest, read-only).** Stay on `main` or hop tags:
+
+```bash
+git checkout v0        # raw app, explain it
+# run the phase-0 exercises + checks
+git checkout v1        # + personas / CoT / structured output
+git checkout v2        # + memory and /compact
+git checkout v3        # + agents and tools
+git checkout v4        # + MCP (local and external)
+git switch main        # back to newest
+```
+
+**B. Build-it-live (the two-clone workshop), from `workshop/PASTE_GUIDE.md`:**
+
+- **Clone A (typing):** `git switch -c live v0` once, then paste the diffs step by
+  step, committing each. They advance by pasting + committing, never by switching
+  branches.
+- **Clone B (showcase):** read-only; `git checkout vN` to reveal the finished
+  result after each step.
+- If a live paste goes wrong: `git apply workshop/patches/stepN.patch`.
 
 Both tag families are rebuilt from the current tree with:
 
 ```bash
 python scripts/build_git_tags.py
 ```
+
+After rebuilding tags, an existing clone should refresh them with
+`git fetch --tags --force`.
 
 ## 6. Model configuration
 
@@ -198,19 +256,23 @@ study-buddy/
 │   ├── main.py          # Unified FastAPI backend with all endpoints
 │   ├── prompts.py       # Personas, few-shot builders, system prompts
 │   ├── schemas.py       # Pydantic schemas (Flashcard, StudyPlanDay, QuizItem)
-│   ├── tools.py         # Tool schemas and execution registry (search, schedule, grade)
+│   ├── tools.py         # Tool schemas + TOOL_REGISTRY (search, schedule, grade, notes)
+│   ├── notes_store.py   # Persistent notes on disk (data/notes/), survive new sessions
 │   ├── memory.py        # Session history, sliding window, compaction
 │   ├── context.py       # Context token breakdown & metadata injection
 │   ├── security.py      # Prompt injection detection, PII scrubbing, output moderation
 │   ├── agent.py         # Autonomous ReAct loop, safety caps, multi-agent planner
+│   ├── mcp_client.py    # MCP client — local (stdio) and external (HTTP)
 │   ├── evals/           # LLM-as-a-judge evaluator
 │   └── static/          # Single-file HTML/CSS/JS interactive frontend
 ├── common/              # Shared client: llm.chat() + token counting
 ├── data/sample_notes/   # 13 sample study notes (used by the search_notes tool)
+│                        #   saved notes land in data/notes/ (git-ignored)
 ├── archive/             # Parked material — preserved, not part of the main flow
 │   ├── rag/             #   retrieval stack (embeddings/vector DB/RAG)
 │   ├── phase5_safety/   #   Phase 5 — AI safety concepts
-│   └── phase6_eval_observability/  # Phase 6 — evaluation concepts
+│   ├── phase6_eval_observability/  # Phase 6 — evaluation concepts
+│   └── instructor_guides/          #   guides for the archived phases
 ├── mcp_server/          # Standard Model Context Protocol (MCP) server
 ├── scripts/             # smoke_test.py, switch_version.py, build_* helpers
 ├── instructor_guides/   # Detailed pedagogical guides & timing for Phases 0–4
@@ -237,17 +299,21 @@ study-buddy/
 | `/context-report`| `GET` | 2.1 | Token usage breakdown across prompt roles |
 | `/session/{id}/history` | `GET` | 2.2 | Retrieve full conversation memory for a session |
 | `/session/{id}` | `DELETE`| 2.2 | Clear session memory |
+| `/session/{id}/compact` | `POST` | 2.3 | Compact a session on demand (backs the `/compact` chat command) |
 | `/measure-long-context` | `POST` | 2.4 | Latency & cost benchmarking for expanding token windows |
 | `/agent/ask` | `POST` | 3 | Autonomous ReAct agent loop with execution trace |
 | `/agent/plan-and-execute` | `POST` | 3 | Multi-agent Planner → Executor → Critic pipeline |
 | `/mcp/tools` | `GET` | 4 | Tools discovered from the MCP server over stdio |
+| `/mcp/external` | `GET` | 4 | External MCP server config (URL, label, ask tool) |
 | `/mcp/external/tools` | `GET` | 4 | Tools on a remote MCP server (live docs), over HTTP |
+| `/mcp/external/call` | `POST` | 4 | Call any tool on the external MCP server |
 | `/mcp/external/ask` | `POST` | 4 | Ask the external docs server a question (live) |
-| `/eval/regression-report` | `GET` | 6 | Automated regression benchmark report |
+| `/eval/regression-report` | `GET` | 6 (archived) | Automated regression benchmark report |
 
 ## 9. Running the Model Context Protocol (MCP) Server
 
-Study Buddy includes an MCP server wrapping the tools (`search_notes`, `get_exam_schedule`, `calculate_grade`):
+Study Buddy includes an MCP server wrapping the tools (`search_notes`,
+`get_exam_schedule`, `calculate_grade`, `store_note`, `get_note`, `list_notes`):
 
 ```bash
 python mcp_server/server.py
