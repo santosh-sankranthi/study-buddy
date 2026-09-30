@@ -28,8 +28,6 @@ from __future__ import annotations
 import sys
 import re
 import time
-import json
-import urllib.request
 from pathlib import Path
 
 # Locate the app package by walking up from this file, so this module works
@@ -54,7 +52,7 @@ from app.security import moderate, sanitize_input, scrub_pii
 
 STATIC_DIR = _APP_DIR / "static"
 
-app = FastAPI(title="Study Buddy", version="v6")
+app = FastAPI(title="Study Buddy", version="v5")
 
 # ────────────────────────────────────────────────────────────────────────────
 # CONCEPT · /meta — capability manifest  [all phases]
@@ -68,7 +66,7 @@ def meta() -> dict:
         provider = provider_info()
     except Exception:  # noqa: BLE001
         provider = {}
-    return {"version": "v6", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp', 'security', 'evals'], **provider}
+    return {"version": "v5", "features": ['personas', 'sampling', 'cot', 'structured', 'tools_schema', 'memory', 'context', 'agents', 'mcp', 'security'], **provider}
 
 # ────────────────────────────────────────────────────────────────────────────
 # CONCEPT · API request / response contract  [Phase 1.4]
@@ -487,51 +485,6 @@ def mcp_external_ask(body: dict) -> dict:
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=503, detail=f"External MCP call failed: {exc}")
     return {"repo": repo, "question": question, "result": result}
-
-# ────────────────────────────────────────────────────────────────────────────
-# CONCEPT · Regression testing  [Phase 6]
-# Run a built-in eval set against the running app.
-# ────────────────────────────────────────────────────────────────────────────
-
-EVAL_SET = [
-    {"question": "What is photosynthesis?",              "check": lambda r: "light" in r.lower() or "energy" in r.lower()},
-    {"question": "Where does photosynthesis occur?",     "check": lambda r: "chloro" in r.lower()},
-    {"question": "What gas does photosynthesis release?", "check": lambda r: "oxygen" in r.lower() or "o2" in r.lower()},
-    {"question": "What is Newton's second law?",         "check": lambda r: "f" in r.lower() and "m" in r.lower()},
-    {"question": "What is cellular respiration?",        "check": lambda r: "energy" in r.lower() or "atp" in r.lower()},
-]
-
-
-@app.get("/eval/regression-report")
-def regression_report() -> dict:
-    """Run a mini built-in eval set against a locally running server."""
-    passed  = 0
-    results = []
-    for case in EVAL_SET:
-        try:
-            payload = json.dumps({
-                "question": case["question"],
-                "mode":     "direct",
-            }).encode()
-            req = urllib.request.Request(
-                "http://localhost:8000/ask",
-                data=payload,
-                headers={"Content-Type": "application/json"},
-            )
-            with urllib.request.urlopen(req, timeout=15) as resp:  # noqa: S310
-                answer = json.loads(resp.read()).get("answer", "")
-            ok = case["check"](answer)
-            passed += int(ok)
-            results.append({"question": case["question"], "passed": ok})
-        except Exception as exc:  # noqa: BLE001
-            results.append({"question": case["question"], "passed": False, "error": str(exc)})
-
-    return {
-        "total":     len(EVAL_SET),
-        "passed":    passed,
-        "pass_rate": round(passed / len(EVAL_SET), 3),
-        "details":   results,
-    }
 
 # ────────────────────────────────────────────────────────────────────────────
 # CONCEPT · Frontend  [all phases]
